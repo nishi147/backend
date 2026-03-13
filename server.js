@@ -8,7 +8,7 @@ const app = express();
 
 // Middleware
 app.use(cors({
-    origin: process.env.CLIENT_URL || 'http://localhost:5000',
+    origin: process.env.CLIENT_URL || 'http://localhost:3001',
     credentials: true,
 }));
 app.use(express.json());
@@ -21,6 +21,8 @@ app.use('/api/users', require('./routes/users'));
 app.use('/api/courses', require('./routes/courses'));
 app.use('/api/payments', require('./routes/payments'));
 app.use('/api/live-classes', require('./routes/liveClasses'));
+app.use('/api/workshops', require('./routes/workshops'));
+
 
 // Database Connection
 mongoose.connect(process.env.MONGODB_URI)

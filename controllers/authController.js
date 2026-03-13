@@ -46,8 +46,10 @@ exports.register = async (req, res) => {
             email,
             password,
             role: role || 'student',
-            isApprovedTeacher: role === 'admin' ? true : false, // For simplicity, admins are auto-approved for teacher actions if they want
+            isApprovedTeacher: role === 'admin' ? true : false,
+            profilePicture: req.file ? `/uploads/${req.file.filename}` : ''
         });
+
 
         sendTokenResponse(user, 201, res);
     } catch (error) {

@@ -27,6 +27,18 @@ exports.approveTeacher = async (req, res) => {
      }
 }
 
+// @desc    Approve Student
+// @route   PUT /api/users/approve-student/:id
+// @access  Private/Admin
+exports.approveStudent = async (req, res) => {
+    try {
+        const user = await User.findByIdAndUpdate(req.params.id, { isApprovedStudent: true }, { new: true });
+        res.status(200).json({ success: true, data: user });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
 // @desc    Get Platform Analytics
 // @route   GET /api/users/analytics
 // @access  Private/Admin

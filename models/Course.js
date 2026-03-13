@@ -17,6 +17,7 @@ const ModuleSchema = new mongoose.Schema({
 const CourseSchema = new mongoose.Schema({
     title: { type: String, required: true },
     description: { type: String, required: true },
+    category: { type: String, required: true },
     thumbnail: { type: String },
     teacher: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     isPublished: { type: Boolean, default: false },
@@ -32,9 +33,8 @@ const CourseSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 // Pre-save to calculate total price
-CourseSchema.pre('save', function(next) {
+CourseSchema.pre('save', async function() {
     this.totalCoursePrice = this.numberOfSessions * this.pricePerSession;
-    next();
 });
 
 module.exports = mongoose.model('Course', CourseSchema);

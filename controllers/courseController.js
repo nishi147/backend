@@ -38,24 +38,33 @@ exports.getCourse = async (req, res) => {
 // @access  Private (Teacher, Admin)
 exports.createCourse = async (req, res) => {
     try {
+        console.log("Creating Course Request Body:", req.body);
+        
         // Add user to req.body
         req.body.teacher = req.user.id;
         
         // Ensure price calculations
-        if (req.body.numberOfSessions && req.body.pricePerSession) {
-            req.body.totalCoursePrice = req.body.numberOfSessions * req.body.pricePerSession;
-        }
+        const num = Number(req.body.numberOfSessions) || 0;
+        const price = Number(req.body.pricePerSession) || 0;
+        req.body.totalCoursePrice = num * price;
 
-        // Auto-approve and publish for now to satisfy user requirements
-        req.body.isApproved = true;
-        req.body.isPublished = true;
+        // Handle File Upload
+        if (req.file) {
+            req.body.thumbnail = `/uploads/${req.file.filename}`;
+        }
 
         const course = await Course.create(req.body);
 
+
         res.status(201).json({ success: true, data: course });
     } catch (error) {
-        console.error("Course Create Error:", error);
-        res.status(500).json({ success: false, message: 'Server error', error: error.message });
+        console.error("Course Create Error Full Details:", error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Server error', 
+            error: error.message,
+            validationErrors: error.errors ? Object.keys(error.errors) : []
+        });
     }
 };
 

@@ -10,6 +10,8 @@ const {
     approveCourse
 } = require('../controllers/courseController');
 const { protect, authorize } = require('../middleware/auth');
+const upload = require('../utils/upload');
+
 
 const router = express.Router();
 
@@ -23,7 +25,8 @@ router.put('/admin/approve/:id', protect, authorize('admin'), approveCourse);
 // Public Routes
 router.route('/')
     .get(getCourses)
-    .post(protect, authorize('teacher', 'admin'), createCourse);
+    .post(protect, authorize('teacher', 'admin'), upload.single('thumbnail'), createCourse);
+
 
 router.route('/:id')
     .get(getCourse)

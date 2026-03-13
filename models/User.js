@@ -7,6 +7,7 @@ const UserSchema = new mongoose.Schema({
     password: { type: String, required: true },
     role: { type: String, enum: ['student', 'teacher', 'admin'], default: 'student' },
     isApprovedTeacher: { type: Boolean, default: false }, // Admins must approve teachers
+    isApprovedStudent: { type: Boolean, default: false }, // Admins must approve students
     profilePicture: { type: String, default: '' },
     progress: [{
         courseId: { type: mongoose.Schema.Types.ObjectId, ref: 'Course' },
