@@ -75,24 +75,9 @@ mongoose.connect(process.env.MONGODB_URI, {
 
 
 // Middleware
-const allowedOrigins = [
-    'http://localhost:3001',
-    'http://localhost:3000',
-    'https://frontend-gilt-two-38.vercel.app',
-    process.env.CLIENT_URL
-].filter(Boolean);
-
 app.use(cors({
-    origin: function (origin, callback) {
-        if (!origin) return callback(null, true);
-
-        if (!allowedOrigins.includes(origin)) {
-            return callback(new Error('Not allowed by CORS'));
-        }
-
-        return callback(null, true);
-    },
-    credentials: true,
+  origin: true,
+  credentials: true,
 }));
 
 app.use(express.json());
