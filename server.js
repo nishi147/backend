@@ -25,7 +25,10 @@ app.use('/api/workshops', require('./routes/workshops'));
 
 
 // Database Connection
-mongoose.connect(process.env.MONGODB_URI)
+mongoose.connect(process.env.MONGODB_URI, {
+    family: 4, // Force IPv4 to avoid DNS loop issues with SRV
+    serverSelectionTimeoutMS: 5000 // 5 seconds timeout
+})
     .then(() => console.log('Connected to MongoDB'))
     .catch((err) => console.error('MongoDB connection error:', err));
 
