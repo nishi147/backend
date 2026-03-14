@@ -8,7 +8,10 @@ const UserSchema = new mongoose.Schema({
     role: { type: String, enum: ['student', 'teacher', 'admin'], default: 'student' },
     isApprovedTeacher: { type: Boolean, default: false }, // Admins must approve teachers
     isApprovedStudent: { type: Boolean, default: false }, // Admins must approve students
+    specialization: { type: String, default: '' }, // e.g., "Coding Expert", "Math Wizard"
     profilePicture: { type: String, default: '' },
+    resetPasswordToken: String,
+    resetPasswordExpire: Date,
     progress: [{
         courseId: { type: mongoose.Schema.Types.ObjectId, ref: 'Course' },
         completedLessons: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Lesson' }]
@@ -24,6 +27,24 @@ UserSchema.pre('save', async function() {
 
 UserSchema.methods.matchPassword = async function(enteredPassword) {
     return await bcrypt.compare(enteredPassword, this.password);
+};
+
+// Generate and hash password token
+UserSchema.methods.getResetPasswordToken = function() {
+  const crypto = require('crypto');
+  // Generate token
+  const resetToken = crypto.randomBytes(20).toString('hex');
+
+  // Hash token and set to resetPasswordToken field
+  this.resetPasswordToken = crypto
+    .createHash('sha256')
+    .update(resetToken)
+    .digest('hex');
+
+  // Set expire
+  this.resetPasswordExpire = Date.now() + 10 * 60 * 1000; // 10 mins
+
+  return resetToken;
 };
 
 module.exports = mongoose.model('User', UserSchema);

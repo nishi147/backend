@@ -15,6 +15,19 @@ exports.getUsers = async (req, res) => {
     }
 };
 
+// @desc    Get all approved teachers
+// @route   GET /api/users/teachers
+// @access  Public
+exports.getApprovedTeachers = async (req, res) => {
+    try {
+        const teachers = await User.find({ role: 'teacher', isApprovedTeacher: true })
+            .select('name profilePicture specialization');
+        res.status(200).json({ success: true, data: teachers });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+};
+
 // @desc    Approve Teacher
 // @route   PUT /api/users/approve-teacher/:id
 // @access  Private/Admin
@@ -66,3 +79,30 @@ exports.getAnalytics = async (req, res) => {
          res.status(500).json({ success: false, message: 'Server error' });
     }
 }
+// @desc    Delete user
+// @route   DELETE /api/users/:id
+// @access  Private/Admin
+exports.deleteUser = async (req, res) => {
+    try {
+        const user = await User.findById(req.params.id);
+
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'User not found' });
+        }
+
+        // Prevent deleting yourself (admin)
+        if (user._id.toString() === req.user.id.toString()) {
+            return res.status(400).json({ success: false, message: 'You cannot delete yourself' });
+        }
+
+        await user.deleteOne();
+
+        res.status(200).json({
+            success: true,
+            data: {}
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+};

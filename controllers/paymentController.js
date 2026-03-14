@@ -18,14 +18,18 @@ const razorpay = new Razorpay({
 // @access  Private (Student)
 exports.createOrder = async (req, res) => {
     try {
-        const { courseId } = req.body;
+        const { courseId, sessions } = req.body;
         
         const course = await Course.findById(courseId);
         if (!course) {
             return res.status(404).json({ success: false, message: 'Course not found' });
         }
 
-        const amount = course.totalCoursePrice * 100; // Razorpay expects amount in paise
+        if (!sessions || sessions < 1 || sessions > course.numberOfSessions) {
+            return res.status(400).json({ success: false, message: 'Invalid number of sessions' });
+        }
+
+        const amount = course.pricePerSession * sessions * 100; // Razorpay expects amount in paise
 
         const options = {
             amount: amount,
@@ -47,7 +51,7 @@ exports.createOrder = async (req, res) => {
 // @access  Private (Student)
 exports.verifyPayment = async (req, res) => {
     try {
-        const { razorpay_order_id, razorpay_payment_id, razorpay_signature, courseId } = req.body;
+        const { razorpay_order_id, razorpay_payment_id, razorpay_signature, courseId, sessions, amount } = req.body;
 
         const sign = razorpay_order_id + "|" + razorpay_payment_id;
         const expectedSign = crypto
@@ -64,7 +68,7 @@ exports.verifyPayment = async (req, res) => {
                 order_id: razorpay_order_id,
                 user_id: req.user.id,
                 course_id: courseId,
-                amount: course.totalCoursePrice,
+                amount: amount,
                 status: 'success'
             });
 
@@ -72,6 +76,8 @@ exports.verifyPayment = async (req, res) => {
             await Enrollment.create({
                 student: req.user.id,
                 course: courseId,
+                sessionsPurchased: sessions,
+                amountPaid: amount,
                 status: 'active',
                 paymentId: payment._id
             });
