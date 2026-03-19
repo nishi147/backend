@@ -37,37 +37,59 @@ exports.getCourse = async (req, res) => {
 // @route   POST /api/courses
 // @access  Private (Teacher, Admin)
 exports.createCourse = async (req, res) => {
-    try {
-        console.log("Creating Course Request Body:", req.body);
-        
-        // Add user to req.body
-        req.body.teacher = req.user.id;
-        
-        // Ensure price calculations
-        const num = Number(req.body.numberOfSessions) || 0;
-        const price = Number(req.body.pricePerSession) || 0;
-        req.body.totalCoursePrice = num * price;
+  console.log("--- COURSE CREATE DEBUG START ---");
+  console.log("BODY:", req.body);
+  console.log("FILE:", req.file);
 
-        // Handle File Upload
-        if (req.file) {
-            req.body.thumbnail = `/uploads/${req.file.filename}`;
-        }
+  try {
+    const title = req.body?.title;
+    const category = req.body?.category;
+    const description = req.body?.description;
+    const numberOfSessions = Number(req.body?.numberOfSessions) || 1;
+    const pricePerSession = Number(req.body?.pricePerSession) || 0;
 
-        const course = await Course.create(req.body);
-
-
-        res.status(201).json({ success: true, data: course });
-    } catch (error) {
-        console.error("Course Create Error Full Details:", error);
-        res.status(500).json({ 
-            success: false, 
-            message: 'Server error', 
-            error: error.message,
-            validationErrors: error.errors ? Object.keys(error.errors) : []
-        });
+    // ✅ Validation
+    if (!title || !category) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing required fields"
+      });
     }
-};
 
+    // ✅ Thumbnail handling (URL only)
+    const thumbnail = req.body?.thumbnail || "";
+
+    // ✅ SAFE DATA (NO SPREAD)
+    const courseData = {
+      title,
+      category,
+      description,
+      thumbnail,
+      teacher: req.user?.id,
+      numberOfSessions,
+      pricePerSession,
+      totalCoursePrice: numberOfSessions * pricePerSession
+    };
+
+    const course = await Course.create(courseData);
+
+    console.log("--- COURSE CREATE SUCCESS ---");
+
+    return res.status(201).json({
+      success: true,
+      data: course
+    });
+
+  } catch (error) {
+    console.error("--- COURSE CREATE CRASH ---");
+    console.error(error);
+
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
 // @desc    Get courses for current teacher
 // @route   GET /api/courses/teacher/my-courses
 // @access  Private (Teacher)
@@ -84,33 +106,62 @@ exports.getTeacherCourses = async (req, res) => {
 // @route   PUT /api/courses/:id
 // @access  Private (Teacher, Admin)
 exports.updateCourse = async (req, res) => {
+    // 1. Mandatory Debug Logging
+    console.log("Body Keys:", Object.keys(req.body || {}));
+
     try {
         let course = await Course.findById(req.params.id);
 
         if (!course) {
+            console.error("Update Failed: Course not found with ID", req.params.id);
             return res.status(404).json({ success: false, message: 'Course not found' });
         }
 
-        // Make sure user is course owner or admin
-        if (course.teacher.toString() !== req.user.id && req.user.role !== 'admin') {
+        // 2. Authorization Check
+        if (course.teacher.toString() !== req.user?.id && req.user?.role !== 'admin') {
+            console.error("Update Failed: Non-authorized user attempt");
             return res.status(403).json({ success: false, message: 'Not authorized to update course' });
         }
 
-        // Update the total course price if sessions or price changed
-        if (req.body.numberOfSessions || req.body.pricePerSession) {
-            const num = req.body.numberOfSessions || course.numberOfSessions;
-            const price = req.body.pricePerSession || course.pricePerSession;
+        // 3. Safely parse FormData stringified arrays
+        if (req.body?.modules && typeof req.body.modules === 'string') {
+            try { 
+                req.body.modules = JSON.parse(req.body.modules); 
+                console.log("Parsed modules string to JSON successfully.");
+            } 
+            catch(err) { 
+                console.error("JSON Parse Error for modules field:", err.message);
+                return res.status(400).json({ success: false, message: 'Curriculum format is invalid.' }); 
+            }
+        }
+
+        // 4. Thumbnail is now handled directly via req.body.thumbnail (JSON)
+
+        // 5. Safe Price Recalculation
+        if (req.body?.numberOfSessions || req.body?.pricePerSession) {
+            const num = Number(req.body?.numberOfSessions || course.numberOfSessions);
+            const price = Number(req.body?.pricePerSession || course.pricePerSession);
             req.body.totalCoursePrice = num * price;
         }
 
+        // 6. DB Operation
         course = await Course.findByIdAndUpdate(req.params.id, req.body, {
             new: true,
             runValidators: true
         });
 
+        console.log("--- COURSE UPDATE SUCCESS ---");
         res.status(200).json({ success: true, data: course });
+
     } catch (error) {
-        res.status(500).json({ success: false, message: 'Server error' });
+        console.error("--- COURSE UPDATE CRASH ---");
+        console.error(error);
+        
+        res.status(500).json({ 
+            success: false, 
+            message: 'Internal server error during course update',
+            error: error.message 
+        });
     }
 };
 

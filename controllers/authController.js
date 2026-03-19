@@ -43,20 +43,26 @@ exports.register = async (req, res) => {
             return res.status(400).json({ success: false, message: 'User already exists' });
         }
 
+        let profilePicture = '';
+        if (req.file) {
+            const b64 = Buffer.from(req.file.buffer).toString('base64');
+            profilePicture = `data:${req.file.mimetype};base64,${b64}`;
+        }
+
         user = await User.create({
             name,
             email,
             password,
             role: role || 'student',
             isApprovedTeacher: role === 'admin' ? true : false,
-            profilePicture: req.file ? `/uploads/${req.file.filename}` : ''
+            profilePicture
         });
 
 
         sendTokenResponse(user, 201, res);
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ success: false, message: 'Server error', error: error.message });
+        console.error("Register Error:", error);
+        res.status(500).json({ success: false, message: 'Server error in register', error: error.message });
     }
 };
 
@@ -82,8 +88,8 @@ exports.login = async (req, res) => {
 
         sendTokenResponse(user, 200, res);
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ success: false, message: 'Server error' });
+        console.error("Login Error:", error);
+        res.status(500).json({ success: false, message: 'Server error in login', error: error.message, stack: error.stack });
     }
 };
 
@@ -96,12 +102,31 @@ exports.logout = (req, res) => {
     res.status(200).json({ success: true, data: {} });
 };
 
+const Enrollment = require('../models/Enrollment');
+
+// @desc    Get current logged in user
+// @route   GET /api/auth/me
+// @access  Private
 exports.getMe = async (req, res) => {
     try {
         const user = await User.findById(req.user.id);
-        res.status(200).json({ success: true, data: user });
+        
+        // Fetch enrollments if student
+        let enrollments = [];
+        if (user.role === 'student') {
+            enrollments = await Enrollment.find({ student: req.user.id, status: 'active' }).select('course status');
+        }
+
+        res.status(200).json({ 
+            success: true, 
+            data: {
+                ...user.toObject(),
+                enrollments
+            } 
+        });
     } catch (error) {
-        res.status(500).json({ success: false, message: 'Server error' });
+        console.error("GetMe Error:", error);
+        res.status(500).json({ success: false, message: 'Server error in getMe', error: error.message });
     }
 };
 

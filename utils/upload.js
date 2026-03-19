@@ -2,21 +2,10 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-// Ensure uploads directory exists
-const uploadDir = path.join(__dirname, '../uploads');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
+// No need to ensure uploads directory for memory storage
 
 // Set storage engine
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, path.join(__dirname, '../uploads'));
-  },
-  filename: function (req, file, cb) {
-    cb(null, `${file.fieldname}-${Date.now()}${path.extname(file.originalname)}`);
-  }
-});
+const storage = multer.memoryStorage(); // Vercel-safe memory storage
 
 // Check file type
 function checkFileType(file, cb) {
@@ -34,7 +23,7 @@ function checkFileType(file, cb) {
 // Init upload
 const upload = multer({
   storage: storage,
-  limits: { fileSize: 5000000 }, // 5MB
+  limits: { fileSize: 4000000 }, // 4MB (Stay below Vercel's 4.5MB limit)
   fileFilter: function (req, file, cb) {
     checkFileType(file, cb);
   }

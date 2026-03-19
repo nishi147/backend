@@ -23,9 +23,8 @@ router.get('/admin/all', protect, authorize('admin'), getAllCoursesAdmin);
 router.put('/admin/approve/:id', protect, authorize('admin'), approveCourse);
 
 // Public Routes
-router.route('/')
-    .get(getCourses)
-    .post(protect, authorize('teacher', 'admin'), upload.single('thumbnail'), createCourse);
+router.get('/', getCourses);
+router.post('/', protect, authorize('teacher', 'admin'), createCourse);
 
 
 router.route('/:id')

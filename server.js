@@ -65,14 +65,30 @@ const { getApprovedTeachers } = require('./controllers/userController');
 
 const app = express();
 
-// Database Connection
-mongoose.connect(process.env.MONGODB_URI, {
-    family: 4,
-    serverSelectionTimeoutMS: 10000
-})
-.then(() => console.log('Connected to MongoDB'))
-.catch((err) => console.error('MongoDB connection error:', err));
+// Database Connection (Cached for Serverless Stability)
+let isConnected = false;
 
+const connectDB = async () => {
+    if (isConnected) {
+        console.log('MongoDB is already connected');
+        return;
+    }
+    try {
+        const db = await mongoose.connect(process.env.MONGODB_URI, {
+            family: 4,
+            serverSelectionTimeoutMS: 10000,
+            maxPoolSize: 10 // Prevent exhausting Free Tier connections
+        });
+        isConnected = db.connections[0].readyState === 1;
+        console.log('Connected to MongoDB');
+    } catch (err) {
+        console.error('MongoDB connection error:', err);
+        // Do not crash server, let routes handle 500 logic safely against DB checks
+    }
+};
+
+// Initialize connection
+connectDB();
 
 // Middleware
 app.use(cors({
@@ -80,7 +96,8 @@ app.use(cors({
   credentials: true,
 }));
 
-app.use(express.json());
+app.use(express.json({ limit: '5mb' }));
+app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 app.use(cookieParser());
 app.use('/uploads', express.static('uploads'));
 
@@ -95,6 +112,7 @@ app.use('/api/payments', require('./routes/payments'));
 app.use('/api/live-classes', require('./routes/liveClasses'));
 app.use('/api/workshops', require('./routes/workshops'));
 app.use('/api/projects', require('./routes/projects'));
+app.use('/api/curriculum', require('./routes/curriculum'));
 
 
 // Start server only for local development
@@ -105,6 +123,33 @@ if (process.env.NODE_ENV !== 'production') {
         console.log(`Server running on port ${PORT}`);
     });
 }
+
+// Global Error Handler (Critical for Vercel/Serverless JSON stability)
+app.use((err, req, res, next) => {
+    console.error("GLOBAL SERVER ERROR:", err);
+    
+    // 1. Handle Multer Storage/Limit errors
+    if (err.name === 'MulterError' || err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ 
+            success: false, 
+            message: `Upload Error: ${err.message}`,
+            code: err.code 
+        });
+    }
+
+    // 2. Handle JSON Parsing errors (Body Parser)
+    if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+        return res.status(400).json({ success: false, message: 'Invalid JSON payload' });
+    }
+
+    // 3. Fallback for all other errors
+    const statusCode = err.status || err.statusCode || 500;
+    res.status(statusCode).json({
+        success: false,
+        message: err.message || 'Server error',
+        error: process.env.NODE_ENV === 'production' ? 'Internal server error' : err.stack
+    });
+});
 
 // Export for Vercel
 module.exports = app;
