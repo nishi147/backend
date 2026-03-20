@@ -6,10 +6,12 @@ const Enrollment = require('../models/Enrollment');
 // @access  Public
 exports.getCourses = async (req, res) => {
     try {
-        const courses = await Course.find({ isPublished: true, isApproved: true }).populate({
-            path: 'teacher',
-            select: 'name profilePicture'
-        });
+        const courses = await Course.find({ isPublished: true, isApproved: true })
+            .populate({
+                path: 'teacher',
+                select: 'name profilePicture'
+            })
+            .populate('category');
         res.status(200).json({ success: true, count: courses.length, data: courses });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Server error' });
@@ -22,7 +24,8 @@ exports.getCourses = async (req, res) => {
 exports.getCourse = async (req, res) => {
     try {
         const course = await Course.findById(req.params.id)
-            .populate({ path: 'teacher', select: 'name profilePicture' });
+            .populate({ path: 'teacher', select: 'name profilePicture' })
+            .populate('category');
         
         if (!course) {
             return res.status(404).json({ success: false, message: 'Course not found' });
@@ -47,6 +50,10 @@ exports.createCourse = async (req, res) => {
     const description = req.body?.description;
     const numberOfSessions = Number(req.body?.numberOfSessions) || 1;
     const pricePerSession = Number(req.body?.pricePerSession) || 0;
+    const ageGroup = req.body?.ageGroup || 'All';
+    const courseType = req.body?.courseType || 'Group';
+    const rating = Number(req.body?.rating) || 5.0;
+    const studentsEnrolled = Number(req.body?.studentsEnrolled) || 0;
 
     // ✅ Validation
     if (!title || !category) {
@@ -68,7 +75,11 @@ exports.createCourse = async (req, res) => {
       teacher: req.user?.id,
       numberOfSessions,
       pricePerSession,
-      totalCoursePrice: numberOfSessions * pricePerSession
+      totalCoursePrice: numberOfSessions * pricePerSession,
+      ageGroup,
+      courseType,
+      rating,
+      studentsEnrolled
     };
 
     const course = await Course.create(courseData);
@@ -95,7 +106,7 @@ exports.createCourse = async (req, res) => {
 // @access  Private (Teacher)
 exports.getTeacherCourses = async (req, res) => {
     try {
-        const courses = await Course.find({ teacher: req.user.id });
+        const courses = await Course.find({ teacher: req.user.id }).populate('category');
         res.status(200).json({ success: true, data: courses });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Server error' });
@@ -194,7 +205,9 @@ exports.deleteCourse = async (req, res) => {
 // @access  Private (Admin)
 exports.getAllCoursesAdmin = async (req, res) => {
     try {
-        const courses = await Course.find().populate({ path: 'teacher', select: 'name' });
+        const courses = await Course.find()
+            .populate({ path: 'teacher', select: 'name' })
+            .populate('category');
         res.status(200).json({ success: true, data: courses });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Server error' });

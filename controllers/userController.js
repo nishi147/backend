@@ -40,6 +40,62 @@ exports.approveTeacher = async (req, res) => {
      }
 }
 
+// @desc    Create Mentor/Teacher (Admin only)
+// @route   POST /api/users/mentors
+// @access  Private/Admin
+exports.createMentor = async (req, res) => {
+    try {
+        const { name, email, password, specialization, profilePicture } = req.body;
+        
+        // Check if user already exists
+        let user = await User.findOne({ email });
+        if (user) {
+            return res.status(400).json({ success: false, message: 'User already exists' });
+        }
+
+        user = await User.create({
+            name,
+            email,
+            password,
+            role: 'teacher',
+            isApprovedTeacher: true,
+            specialization,
+            profilePicture
+        });
+
+        res.status(201).json({ success: true, data: user });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+};
+
+// @desc    Update Mentor/Teacher (Admin only)
+// @route   PUT /api/users/mentors/:id
+// @access  Private/Admin
+exports.updateMentor = async (req, res) => {
+    try {
+        const { name, specialization, profilePicture, isApprovedTeacher } = req.body;
+        
+        let user = await User.findById(req.params.id);
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'Mentor not found' });
+        }
+
+        user = await User.findByIdAndUpdate(req.params.id, {
+            name,
+            specialization,
+            profilePicture,
+            isApprovedTeacher
+        }, { new: true, runValidators: true });
+
+        res.status(200).json({ success: true, data: user });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+};
+
 // @desc    Approve Student
 // @route   PUT /api/users/approve-student/:id
 // @access  Private/Admin

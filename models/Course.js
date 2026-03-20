@@ -18,7 +18,7 @@ const ModuleSchema = new mongoose.Schema({
 const CourseSchema = new mongoose.Schema({
     title: { type: String, required: true },
     description: { type: String, required: true },
-    category: { type: String, required: true },
+    category: { type: mongoose.Schema.Types.ObjectId, ref: 'Category', required: true },
     thumbnail: { type: String },
     teacher: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     isPublished: { type: Boolean, default: false },
@@ -33,6 +33,12 @@ const CourseSchema = new mongoose.Schema({
     shortDescription: { type: String },
     regularPrice: { type: Number, default: 0 },
     offerPrice: { type: Number, default: 0 },
+
+    // New Filter Fields
+    ageGroup: { type: String, enum: ['All', '6-9', '10-12', '13-16'], default: 'All' },
+    courseType: { type: String, enum: ['1:1', 'Group'], default: 'Group' },
+    rating: { type: Number, default: 5.0 },
+    studentsEnrolled: { type: Number, default: 0 },
 
     // Session Pricing (Existing)
     numberOfSessions: { type: Number, required: true, default: 1 },

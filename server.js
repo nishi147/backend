@@ -113,6 +113,9 @@ app.use('/api/live-classes', require('./routes/liveClasses'));
 app.use('/api/workshops', require('./routes/workshops'));
 app.use('/api/projects', require('./routes/projects'));
 app.use('/api/curriculum', require('./routes/curriculum'));
+app.use('/api/categories', require('./routes/categories'));
+app.use('/api/currencies', require('./routes/currencies'));
+app.use('/api/blogs', require('./routes/blogs'));
 
 
 // Start server only for local development
