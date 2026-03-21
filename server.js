@@ -116,6 +116,11 @@ app.use('/api/curriculum', require('./routes/curriculum'));
 app.use('/api/categories', require('./routes/categories'));
 app.use('/api/currencies', require('./routes/currencies'));
 app.use('/api/blogs', require('./routes/blogs'));
+app.use('/api/leads', require('./routes/leads'));
+app.use('/api/referrals', require('./routes/referrals'));
+app.use('/api/analytics', require('./routes/analytics'));
+app.use('/api/coupons', require('./routes/coupons'));
+app.use('/api/testimonials', require('./routes/testimonials'));
 
 
 // Start server only for local development
