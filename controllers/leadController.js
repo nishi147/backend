@@ -45,7 +45,8 @@ exports.getLeads = async (req, res) => {
             const tomorrow = new Date(today);
             tomorrow.setDate(tomorrow.getDate() + 1);
             query = query.find({
-                followUpDate: { $gte: today, $lt: tomorrow }
+                followUpDate: { $gte: today, $lt: tomorrow },
+                status: { $ne: 'Converted' }
             });
         }
 
@@ -178,9 +179,10 @@ exports.updateLead = async (req, res) => {
         let lead = await Lead.findById(req.params.id);
         if (!lead) return res.status(404).json({ success: false, message: 'Lead not found' });
 
-        // If status changed to Converted, set convertedAt
+        // If status changed to Converted, set convertedAt and default revenue
         if (req.body.status === 'Converted' && lead.status !== 'Converted') {
             req.body.convertedAt = Date.now();
+            req.body.revenue = req.body.revenue || 0;
             
             // Mark associated referral as successful
             const Referral = require('../models/Referral');
@@ -188,6 +190,10 @@ exports.updateLead = async (req, res) => {
                 { referredLead: lead._id },
                 { status: 'Successful', reward: '₹500 Intro Bonus' }
             );
+
+            console.log(`[Lead Update] Lead ${lead._id} changed to Converted. Revenue: ₹${req.body.revenue}`);
+        } else if (req.body.status && req.body.status !== lead.status) {
+            console.log(`[Lead Update] ${lead._id} status changed: ${lead.status} -> ${req.body.status}`);
         }
 
         lead = await Lead.findByIdAndUpdate(req.params.id, req.body, {

@@ -104,3 +104,58 @@ exports.getUserAnalytics = async (req, res) => {
         res.status(400).json({ success: false, error: err.message });
     }
 };
+
+// @desc    Get central analytics for CRM
+// @route   GET /api/analytics
+// @access  Private
+exports.getCentralAnalytics = async (req, res) => {
+    try {
+        const totalLeads = await Lead.countDocuments();
+        const convertedLeads = await Lead.countDocuments({ status: 'Converted' });
+        
+        const conversionRate = totalLeads === 0 ? 0 : (convertedLeads / totalLeads) * 100;
+        
+        const revenueData = await Lead.aggregate([
+            { $match: { status: 'Converted' } },
+            { $group: { _id: null, totalRevenue: { $sum: '$revenue' } } }
+        ]);
+        const totalRevenue = revenueData.length > 0 ? revenueData[0].totalRevenue : 0;
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+
+        const followUpsToday = await Lead.countDocuments({
+            followUpDate: { $gte: today, $lt: tomorrow },
+            status: { $ne: 'Converted' }
+        });
+
+        const sourceStats = await Lead.aggregate([
+            { $group: { _id: '$source', count: { $sum: 1 } } }
+        ]);
+
+        const leadsBySource = {};
+        sourceStats.forEach(stat => {
+            if (stat._id) leadsBySource[stat._id] = stat.count;
+        });
+
+        const computedValues = {
+            totalLeads,
+            convertedLeads,
+            conversionRate,
+            totalRevenue,
+            followUpsToday,
+            leadsBySource
+        };
+
+        console.log("Analytics Fetched:", JSON.stringify(computedValues));
+
+        res.status(200).json({
+            success: true,
+            data: computedValues
+        });
+    } catch (err) {
+        res.status(400).json({ success: false, error: err.message });
+    }
+};
