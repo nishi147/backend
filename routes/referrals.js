@@ -9,6 +9,6 @@ const router = express.Router();
 const { protect, authorize } = require('../middleware/auth');
 
 router.get('/', protect, authorize('admin'), getReferrals);
-router.get('/my', protect, getMyReferrals);
+router.get('/me', protect, getMyReferrals);
 
 module.exports = router;

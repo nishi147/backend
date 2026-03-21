@@ -111,6 +111,12 @@ exports.getMe = async (req, res) => {
     try {
         const user = await User.findById(req.user.id);
         
+        // Auto-generate referral code for legacy users
+        if (!user.referralCode) {
+            user.referralCode = 'RUZ' + Math.random().toString(36).substring(2, 7).toUpperCase();
+            await user.save({ validateBeforeSave: false });
+        }
+
         // Fetch enrollments if student
         let enrollments = [];
         if (user.role === 'student') {
