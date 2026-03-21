@@ -45,7 +45,14 @@ exports.getMyReferrals = async (req, res) => {
         
         // Auto-generate referral code if legacy user
         if (!user.referralCode) {
-            user.referralCode = 'RUZ' + Math.random().toString(36).substring(2, 7).toUpperCase();
+            let isUnique = false;
+            let newCode = '';
+            while (!isUnique) {
+                newCode = 'RUZ' + Math.random().toString(36).substring(2, 7).toUpperCase();
+                const existingUser = await User.findOne({ referralCode: newCode });
+                if (!existingUser) isUnique = true;
+            }
+            user.referralCode = newCode;
             await user.save({ validateBeforeSave: false });
         }
 

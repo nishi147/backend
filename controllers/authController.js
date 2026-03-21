@@ -111,9 +111,16 @@ exports.getMe = async (req, res) => {
     try {
         const user = await User.findById(req.user.id);
         
-        // Auto-generate referral code for legacy users
+        // Auto-generate referral code for legacy users if missing
         if (!user.referralCode) {
-            user.referralCode = 'RUZ' + Math.random().toString(36).substring(2, 7).toUpperCase();
+            let isUnique = false;
+            let newCode = '';
+            while (!isUnique) {
+                newCode = 'RUZ' + Math.random().toString(36).substring(2, 7).toUpperCase();
+                const existingUser = await User.findOne({ referralCode: newCode });
+                if (!existingUser) isUnique = true;
+            }
+            user.referralCode = newCode;
             await user.save({ validateBeforeSave: false });
         }
 
