@@ -12,11 +12,12 @@ const router = express.Router();
 
 const { protect, authorize } = require('../middleware/auth');
 
+// IMPORTANT: specific routes must come before /:id wildcards
+router.get('/export', protect, authorize('admin', 'sales'), exportLeads);
+
 router.route('/')
     .get(protect, authorize('admin', 'sales'), getLeads)
     .post(createLead); // Public for lead capture
-
-router.get('/export', protect, authorize('admin', 'sales'), exportLeads);
 
 router.route('/:id')
     .get(protect, authorize('admin', 'sales'), getLead)
