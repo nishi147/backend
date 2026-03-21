@@ -17,7 +17,9 @@ const UserSchema = new mongoose.Schema({
     progress: [{
         courseId: { type: mongoose.Schema.Types.ObjectId, ref: 'Course' },
         completedLessons: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Lesson' }]
-    }]
+    }],
+    stars: { type: Number, default: 0 },
+    gems: { type: Number, default: 0 }
 }, { timestamps: true });
 
 // Hash password before saving

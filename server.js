@@ -122,6 +122,12 @@ app.use('/api/analytics', require('./routes/analytics'));
 app.use('/api/coupons', require('./routes/coupons'));
 app.use('/api/sales', require('./routes/sales'));
 app.use('/api/testimonials', require('./routes/testimonials'));
+app.use('/api/assignments', require('./routes/assignments'));
+app.use('/api/quizzes', require('./routes/quizzes'));
+app.use('/api/messages', require('./routes/messages'));
+app.use('/api/attendance', require('./routes/attendance'));
+app.use('/api/rewards', require('./routes/rewards'));
+app.use('/api/reviews', require('./routes/reviews'));
 
 
 // Start server only for local development

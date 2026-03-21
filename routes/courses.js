@@ -6,6 +6,7 @@ const {
     updateCourse, 
     deleteCourse,
     getTeacherCourses,
+    getStudentCourses,
     getAllCoursesAdmin,
     approveCourse
 } = require('../controllers/courseController');
@@ -17,6 +18,9 @@ const router = express.Router();
 
 // Teacher Routes
 router.get('/teacher/my-courses', protect, authorize('teacher'), getTeacherCourses);
+
+// Student Routes
+router.get('/student/my-courses', protect, authorize('student'), getStudentCourses);
 
 // Admin Routes
 router.get('/admin/all', protect, authorize('admin'), getAllCoursesAdmin);

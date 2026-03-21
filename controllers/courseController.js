@@ -113,6 +113,24 @@ exports.getTeacherCourses = async (req, res) => {
     }
 };
 
+// @desc    Get courses for current student (enrolled)
+// @route   GET /api/courses/student/my-courses
+// @access  Private (Student)
+exports.getStudentCourses = async (req, res) => {
+    try {
+        const enrollments = await Enrollment.find({ student: req.user.id }).populate({
+            path: 'course',
+            populate: { path: 'teacher', select: 'name profilePicture' }
+        });
+        
+        const courses = enrollments.map(e => e.course).filter(Boolean);
+        
+        res.status(200).json({ success: true, data: courses });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+};
+
 // @desc    Update course
 // @route   PUT /api/courses/:id
 // @access  Private (Teacher, Admin)
