@@ -1,14 +1,24 @@
 const nodemailer = require('nodemailer');
 
 const sendEmail = async (options) => {
+  // Diagnostic Logging
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    console.warn('WARNING: SMTP_USER or SMTP_PASS environment variables are missing. Email will likely fail.');
+  }
+
   // Create a transporter
+  const port = process.env.SMTP_PORT || 2525;
   const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST || 'smtp.mailtrap.io',
-    port: process.env.SMTP_PORT || 2525,
+    port: port,
+    secure: port == 465, // true for 465, false for other ports
     auth: {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASS,
     },
+    tls: {
+      rejectUnauthorized: false // Helps with some shared hosting/firewall issues
+    }
   });
 
   const message = {
