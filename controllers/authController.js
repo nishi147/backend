@@ -151,8 +151,9 @@ exports.forgotPassword = async (req, res, next) => {
   console.log('--- Forgot Password Request Received ---');
   console.log('Email:', req.body.email);
   
+  let user;
   try {
-    const user = await User.findOne({ email: req.body.email });
+    user = await User.findOne({ email: req.body.email });
 
     if (!user) {
       console.log('User not found');
@@ -190,10 +191,11 @@ exports.forgotPassword = async (req, res, next) => {
     res.status(200).json({ success: true, data: 'Email sent' });
   } catch (err) {
     console.error('CRITICAL ERROR in forgotPassword:', err);
-    user.resetPasswordToken = undefined;
-    user.resetPasswordExpire = undefined;
-
-    await user.save({ validateBeforeSave: false });
+    if (user) {
+      user.resetPasswordToken = undefined;
+      user.resetPasswordExpire = undefined;
+      await user.save({ validateBeforeSave: false });
+    }
 
     return res.status(500).json({ success: false, message: 'Email could not be sent' });
   }
@@ -203,26 +205,31 @@ exports.forgotPassword = async (req, res, next) => {
 // @route   PUT /api/auth/resetpassword/:resettoken
 // @access  Public
 exports.resetPassword = async (req, res, next) => {
-  // Get hashed token
-  const resetPasswordToken = crypto
-    .createHash('sha256')
-    .update(req.params.resettoken)
-    .digest('hex');
+  try {
+    // Get hashed token
+    const resetPasswordToken = crypto
+      .createHash('sha256')
+      .update(req.params.resettoken)
+      .digest('hex');
 
-  const user = await User.findOne({
-    resetPasswordToken,
-    resetPasswordExpire: { $gt: Date.now() }
-  });
+    const user = await User.findOne({
+      resetPasswordToken,
+      resetPasswordExpire: { $gt: Date.now() }
+    });
 
-  if (!user) {
-    return res.status(400).json({ success: false, message: 'Invalid token' });
+    if (!user) {
+      return res.status(400).json({ success: false, message: 'Invalid token' });
+    }
+
+    // Set new password
+    user.password = req.body.password;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpire = undefined;
+    await user.save();
+
+    sendTokenResponse(user, 200, res);
+  } catch (error) {
+    console.error("Reset Password Error:", error);
+    res.status(500).json({ success: false, message: 'Server error in resetPassword', error: error.message });
   }
-
-  // Set new password
-  user.password = req.body.password;
-  user.resetPasswordToken = undefined;
-  user.resetPasswordExpire = undefined;
-  await user.save();
-
-  sendTokenResponse(user, 200, res);
 };
