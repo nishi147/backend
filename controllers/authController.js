@@ -35,7 +35,7 @@ const sendTokenResponse = (user, statusCode, res) => {
 
 exports.register = async (req, res) => {
     try {
-        const { name, email, password, role } = req.body;
+        const { name, email, phone, password, role } = req.body;
 
         // Check if user exists
         let user = await User.findOne({ email });
@@ -52,6 +52,7 @@ exports.register = async (req, res) => {
         user = await User.create({
             name,
             email,
+            phone,
             password,
             role: role || 'student',
             isApprovedTeacher: role === 'admin' ? true : false,

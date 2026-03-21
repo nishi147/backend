@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const UserSchema = new mongoose.Schema({
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true },
+    phone: { type: String, required: true },
     password: { type: String, required: true, select: false },
     role: { type: String, enum: ['student', 'teacher', 'admin', 'sales'], default: 'student' },
     isApprovedTeacher: { type: Boolean, default: false }, // Admins must approve teachers

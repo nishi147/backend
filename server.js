@@ -120,6 +120,7 @@ app.use('/api/leads', require('./routes/leads'));
 app.use('/api/referrals', require('./routes/referrals'));
 app.use('/api/analytics', require('./routes/analytics'));
 app.use('/api/coupons', require('./routes/coupons'));
+app.use('/api/sales', require('./routes/sales'));
 app.use('/api/testimonials', require('./routes/testimonials'));
 
 

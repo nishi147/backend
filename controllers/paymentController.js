@@ -18,7 +18,8 @@ const razorpay = new Razorpay({
 // @access  Private (Student)
 exports.createOrder = async (req, res) => {
     try {
-        const { courseId, sessions } = req.body;
+        const { courseId, sessions, couponCode } = req.body;
+        const Coupon = require('../models/Coupon');
         
         const course = await Course.findById(courseId);
         if (!course) {
@@ -29,12 +30,34 @@ exports.createOrder = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Invalid number of sessions' });
         }
 
-        const amount = course.pricePerSession * sessions * 100; // Razorpay expects amount in paise
+        let amount = course.pricePerSession * sessions;
+        let discountAmount = 0;
+
+        if (couponCode) {
+            const coupon = await Coupon.findOne({ 
+                code: couponCode.toUpperCase(), 
+                isActive: true, 
+                expiryDate: { $gt: Date.now() } 
+            });
+            if (coupon) {
+                if (coupon.discountType === 'percent') {
+                    discountAmount = (amount * coupon.discountValue) / 100;
+                } else {
+                    discountAmount = coupon.discountValue;
+                }
+                amount = Math.max(0, amount - discountAmount);
+            }
+        }
+
+        const finalAmountInPaise = Math.round(amount * 100);
 
         const options = {
-            amount: amount,
+            amount: finalAmountInPaise,
             currency: 'INR',
             receipt: `receipt_order_${Date.now()}`,
+            notes: {
+                couponCode: couponCode || ''
+            }
         };
 
         const order = await razorpay.orders.create(options);
@@ -51,7 +74,10 @@ exports.createOrder = async (req, res) => {
 // @access  Private (Student)
 exports.verifyPayment = async (req, res) => {
     try {
-        const { razorpay_order_id, razorpay_payment_id, razorpay_signature, courseId, sessions, amount } = req.body;
+        const { razorpay_order_id, razorpay_payment_id, razorpay_signature, courseId, sessions, amount, couponCode } = req.body;
+        const Sale = require('../models/Sale');
+        const Coupon = require('../models/Coupon');
+        const Lead = require('../models/Lead');
 
         const sign = razorpay_order_id + "|" + razorpay_payment_id;
         const expectedSign = crypto
@@ -81,6 +107,37 @@ exports.verifyPayment = async (req, res) => {
                 status: 'active',
                 paymentId: payment._id
             });
+
+            // Handle Coupon/Sale Tracking
+            if (couponCode) {
+                const coupon = await Coupon.findOne({ code: couponCode.toUpperCase() });
+                if (coupon) {
+                    const originalPriceBeforeDiscount = amount / (1 - (coupon.discountType === 'percent' ? coupon.discountValue/100 : 0)); // Approx if fixed not easily reversible without more data, but better to fetch original from course.
+                    // Recalculate original from course for precision
+                    const originalAmount = course.pricePerSession * sessions;
+                    const calculatedDiscount = originalAmount - amount;
+
+                    await Sale.create({
+                        userId: req.user.id,
+                        salesUserId: coupon.createdBy,
+                        couponCode: coupon.code,
+                        originalAmount: originalAmount,
+                        discountAmount: calculatedDiscount,
+                        finalAmount: amount
+                    });
+
+                    // Update Lead
+                    const lead = await Lead.findOne({ 
+                        $or: [{ email: req.user.email }, { phone: req.user.phone }] 
+                    });
+                    if (lead) {
+                        lead.status = 'Converted';
+                        lead.revenue = amount;
+                        lead.convertedAt = Date.now();
+                        await lead.save();
+                    }
+                }
+            }
 
             // Send Confirmation Email
             await sendEmail({

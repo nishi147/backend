@@ -1,6 +1,8 @@
 const Lead = require('../models/Lead');
 const Payment = require('../models/Payment');
 const User = require('../models/User');
+const Sale = require('../models/Sale');
+const Coupon = require('../models/Coupon');
 
 // @desc    Get sales analytics
 // @route   GET /api/analytics/sales
@@ -64,6 +66,44 @@ exports.getSalesAnalytics = async (req, res) => {
             { $sort: { '_id.year': 1, '_id.month': 1 } }
         ]);
 
+        // New Coupon & Sales Metrics
+        const couponStats = await Sale.aggregate([
+            { $group: { _id: '$couponCode', usageCount: { $sum: 1 }, totalRevenue: { $sum: '$finalAmount' } } },
+            { $sort: { usageCount: -1 } },
+            { $limit: 5 }
+        ]);
+
+        const salesUserPerformance = await Sale.aggregate([
+            {
+                $group: {
+                    _id: '$salesUserId',
+                    totalSales: { $sum: 1 },
+                    totalRevenue: { $sum: '$finalAmount' }
+                }
+            },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: '_id',
+                    foreignField: '_id',
+                    as: 'salesUser'
+                }
+            },
+            { $unwind: '$salesUser' },
+            {
+                $project: {
+                    name: '$salesUser.name',
+                    totalSales: 1,
+                    totalRevenue: 1
+                }
+            },
+            { $sort: { totalRevenue: -1 } }
+        ]);
+
+        const revenueFromCoupons = await Sale.aggregate([
+            { $group: { _id: null, total: { $sum: '$finalAmount' } } }
+        ]);
+
         res.status(200).json({
             success: true,
             data: {
@@ -75,7 +115,10 @@ exports.getSalesAnalytics = async (req, res) => {
                 statusStats,
                 followUpToday,
                 leadsOverTime,
-                revenueOverTime
+                revenueOverTime,
+                couponStats,
+                salesUserPerformance,
+                revenueFromCoupons: revenueFromCoupons.length > 0 ? revenueFromCoupons[0].total : 0
             }
         });
     } catch (err) {
@@ -110,13 +153,16 @@ exports.getUserAnalytics = async (req, res) => {
 // @access  Private
 exports.getCentralAnalytics = async (req, res) => {
     try {
-        const totalLeads = await Lead.countDocuments();
-        const convertedLeads = await Lead.countDocuments({ status: 'Converted' });
+        const userFilter = req.user.role === 'sales' ? { salesUserId: req.user.id } : {};
+        const leadFilter = req.user.role === 'sales' ? { assignedTo: req.user.id } : {};
+
+        const totalLeads = await Lead.countDocuments(leadFilter);
+        const convertedLeads = await Lead.countDocuments({ ...leadFilter, status: 'Converted' });
         
         const conversionRate = totalLeads === 0 ? 0 : (convertedLeads / totalLeads) * 100;
         
         const revenueData = await Lead.aggregate([
-            { $match: { status: 'Converted' } },
+            { $match: { ...leadFilter, status: 'Converted' } },
             { $group: { _id: null, totalRevenue: { $sum: '$revenue' } } }
         ]);
         const totalRevenue = revenueData.length > 0 ? revenueData[0].totalRevenue : 0;
@@ -127,11 +173,13 @@ exports.getCentralAnalytics = async (req, res) => {
         tomorrow.setDate(tomorrow.getDate() + 1);
 
         const followUpsToday = await Lead.countDocuments({
+            ...leadFilter,
             followUpDate: { $gte: today, $lt: tomorrow },
             status: { $ne: 'Converted' }
         });
 
         const sourceStats = await Lead.aggregate([
+            { $match: leadFilter },
             { $group: { _id: '$source', count: { $sum: 1 } } }
         ]);
 
@@ -140,11 +188,18 @@ exports.getCentralAnalytics = async (req, res) => {
             if (stat._id) leadsBySource[stat._id] = stat.count;
         });
 
+        const revenueFromCouponsRes = await Sale.aggregate([
+            { $match: userFilter },
+            { $group: { _id: null, total: { $sum: '$finalAmount' } } }
+        ]);
+        const revenueFromCoupons = revenueFromCouponsRes.length > 0 ? revenueFromCouponsRes[0].total : 0;
+
         const computedValues = {
             totalLeads,
             convertedLeads,
             conversionRate,
             totalRevenue,
+            revenueFromCoupons,
             followUpsToday,
             leadsBySource
         };

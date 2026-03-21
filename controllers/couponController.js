@@ -2,21 +2,28 @@ const Coupon = require('../models/Coupon');
 
 // @desc    Get all coupons
 // @route   GET /api/coupons
-// @access  Private (Admin)
+// @access  Private (Admin, Sales)
 exports.getCoupons = async (req, res) => {
     try {
-        const coupons = await Coupon.find().sort('-createdAt');
-        res.status(200).json({ success: true, count: coupons.length, data: coupons });
+        let query;
+        if (req.user.role === 'sales') {
+            query = Coupon.find({ createdBy: req.user._id });
+        } else {
+            query = Coupon.find().populate('createdBy', 'name email');
+        }
+        const coupons = await query;
+        res.status(200).json({ success: true, data: coupons });
     } catch (err) {
         res.status(400).json({ success: false, error: err.message });
     }
 };
 
-// @desc    Create coupon
+// @desc    Create a coupon
 // @route   POST /api/coupons
-// @access  Private (Admin)
+// @access  Private (Sales, Admin)
 exports.createCoupon = async (req, res) => {
     try {
+        req.body.createdBy = req.user._id;
         const coupon = await Coupon.create(req.body);
         res.status(201).json({ success: true, data: coupon });
     } catch (err) {
@@ -24,31 +31,20 @@ exports.createCoupon = async (req, res) => {
     }
 };
 
-// @desc    Delete coupon
-// @route   DELETE /api/coupons/:id
-// @access  Private (Admin)
-exports.deleteCoupon = async (req, res) => {
-    try {
-        const coupon = await Coupon.findByIdAndDelete(req.params.id);
-        if (!coupon) return res.status(404).json({ success: false, message: 'Coupon not found' });
-        res.status(200).json({ success: true, data: {} });
-    } catch (err) {
-        res.status(400).json({ success: false, error: err.message });
-    }
-};
-
-// @desc    Validate coupon
+// @desc    Validate a coupon
 // @route   POST /api/coupons/validate
 // @access  Public
 exports.validateCoupon = async (req, res) => {
     try {
-        const coupon = await Coupon.findOne({ code: req.body.code, isActive: true });
-        if (!coupon) return res.status(404).json({ success: false, message: 'Invalid or expired coupon' });
+        const { code } = req.body;
+        const coupon = await Coupon.findOne({ 
+            code: code.toUpperCase(), 
+            isActive: true,
+            expiryDate: { $gt: Date.now() }
+        });
 
-        if (coupon.expiryDate && coupon.expiryDate < new Date()) {
-            coupon.isActive = false;
-            await coupon.save();
-            return res.status(400).json({ success: false, message: 'Coupon has expired' });
+        if (!coupon) {
+            return res.status(404).json({ success: false, message: 'Invalid or expired coupon' });
         }
 
         res.status(200).json({ success: true, data: coupon });
