@@ -3,6 +3,7 @@ const Payment = require('../models/Payment');
 const User = require('../models/User');
 const Sale = require('../models/Sale');
 const Coupon = require('../models/Coupon');
+const mongoose = require('mongoose');
 
 // @desc    Get sales analytics
 // @route   GET /api/analytics/sales
@@ -34,7 +35,6 @@ exports.getSalesAnalytics = async (req, res) => {
             followUpDate: { $gte: today, $lt: tomorrow }
         });
 
-        const ObjectIds = require('mongoose').Types.ObjectId;
         const sixMonthsAgo = new Date();
         sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 

@@ -7,6 +7,9 @@ const Booking = require('../models/Booking');
 const Workshop = require('../models/Workshop');
 const WorkshopBooking = require('../models/WorkshopBooking');
 const sendEmail = require('../utils/sendEmail');
+const Coupon = require('../models/Coupon');
+const Sale = require('../models/Sale');
+const Lead = require('../models/Lead');
 
 const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID,
@@ -75,9 +78,6 @@ exports.createOrder = async (req, res) => {
 exports.verifyPayment = async (req, res) => {
     try {
         const { razorpay_order_id, razorpay_payment_id, razorpay_signature, courseId, sessions, amount, couponCode } = req.body;
-        const Sale = require('../models/Sale');
-        const Coupon = require('../models/Coupon');
-        const Lead = require('../models/Lead');
 
         const sign = razorpay_order_id + "|" + razorpay_payment_id;
         const expectedSign = crypto
