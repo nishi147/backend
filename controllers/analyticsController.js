@@ -23,6 +23,47 @@ exports.getSalesAnalytics = async (req, res) => {
             { $group: { _id: '$status', count: { $sum: 1 } } }
         ]);
 
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+
+        const followUpToday = await Lead.countDocuments({
+            followUpDate: { $gte: today, $lt: tomorrow }
+        });
+
+        const ObjectIds = require('mongoose').Types.ObjectId;
+        const sixMonthsAgo = new Date();
+        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+        const leadsOverTime = await Lead.aggregate([
+            { $match: { createdAt: { $gte: sixMonthsAgo } } },
+            {
+                $group: {
+                    _id: { 
+                        year: { $year: '$createdAt' }, 
+                        month: { $month: '$createdAt' } 
+                    },
+                    count: { $sum: 1 }
+                }
+            },
+            { $sort: { '_id.year': 1, '_id.month': 1 } }
+        ]);
+
+        const revenueOverTime = await Lead.aggregate([
+            { $match: { status: 'Converted', convertedAt: { $gte: sixMonthsAgo } } },
+            {
+                $group: {
+                    _id: { 
+                        year: { $year: '$convertedAt' }, 
+                        month: { $month: '$convertedAt' } 
+                    },
+                    revenue: { $sum: '$revenue' }
+                }
+            },
+            { $sort: { '_id.year': 1, '_id.month': 1 } }
+        ]);
+
         res.status(200).json({
             success: true,
             data: {
@@ -31,7 +72,10 @@ exports.getSalesAnalytics = async (req, res) => {
                 conversionRate: totalLeads > 0 ? (convertedLeads / totalLeads) * 100 : 0,
                 totalRevenue: revenueData.length > 0 ? revenueData[0].totalRevenue : 0,
                 sourceStats,
-                statusStats
+                statusStats,
+                followUpToday,
+                leadsOverTime,
+                revenueOverTime
             }
         });
     } catch (err) {

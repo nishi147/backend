@@ -4,6 +4,7 @@ const {
     getLead,
     createLead,
     updateLead,
+    deleteLead,
     addNote,
     exportLeads
 } = require('../controllers/leadController');
@@ -21,7 +22,8 @@ router.route('/')
 
 router.route('/:id')
     .get(protect, authorize('admin', 'sales'), getLead)
-    .put(protect, authorize('admin', 'sales'), updateLead);
+    .put(protect, authorize('admin', 'sales'), updateLead)
+    .delete(protect, authorize('admin'), deleteLead);
 
 router.route('/:id/notes')
     .post(protect, authorize('admin', 'sales'), addNote);

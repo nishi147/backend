@@ -12,7 +12,14 @@ exports.getLeads = async (req, res) => {
         if (req.user.role === 'sales') {
             query = Lead.find({ assignedTo: req.user._id });
         } else {
-            query = Lead.find();
+            // Admin can see all, or filter by specific assignee
+            if (req.query.assignedTo === 'me') {
+                query = Lead.find({ assignedTo: req.user._id });
+            } else if (req.query.assignedTo) {
+                query = Lead.find({ assignedTo: req.query.assignedTo });
+            } else {
+                query = Lead.find();
+            }
         }
 
         // Search
@@ -46,9 +53,27 @@ exports.getLeads = async (req, res) => {
         const sortBy = req.query.sort || '-createdAt';
         query = query.sort(sortBy);
 
+        // Pagination
+        const page = parseInt(req.query.page, 10) || 1;
+        const limit = parseInt(req.query.limit, 10) || 50;
+        const startIndex = (page - 1) * limit;
+        
+        // Clone query to get total count before pagination
+        const countQuery = Lead.find().merge(query);
+        const total = await countQuery.countDocuments();
+
+        query = query.skip(startIndex).limit(limit);
+
         const leads = await query.populate('assignedTo', 'name email');
 
-        res.status(200).json({ success: true, count: leads.length, data: leads });
+        res.status(200).json({ 
+            success: true, 
+            count: leads.length,
+            total,
+            page,
+            pages: Math.ceil(total / limit),
+            data: leads 
+        });
     } catch (err) {
         res.status(400).json({ success: false, error: err.message });
     }
@@ -73,6 +98,26 @@ exports.getLead = async (req, res) => {
 exports.createLead = async (req, res) => {
     try {
         const lead = await Lead.create(req.body);
+
+        // Handle Referral Logic properly based on the schema
+        if (lead.referralCode) {
+            const User = require('../models/User');
+            const Referral = require('../models/Referral');
+            
+            // Find referrer user by code
+            const referrerUser = await User.findOne({ referralCode: lead.referralCode.toUpperCase() });
+            
+            if (referrerUser) {
+                // Create a referral tracking doc for this lead
+                await Referral.create({
+                    referrer: referrerUser._id,
+                    referredLead: lead._id,
+                    status: 'Pending',
+                    reward: 'Standard'
+                });
+            }
+        }
+
         res.status(201).json({ success: true, data: lead });
     } catch (err) {
         res.status(400).json({ success: false, error: err.message });
@@ -90,6 +135,13 @@ exports.updateLead = async (req, res) => {
         // If status changed to Converted, set convertedAt
         if (req.body.status === 'Converted' && lead.status !== 'Converted') {
             req.body.convertedAt = Date.now();
+            
+            // Mark associated referral as successful
+            const Referral = require('../models/Referral');
+            await Referral.findOneAndUpdate(
+                { referredLead: lead._id },
+                { status: 'Successful', reward: '₹500 Intro Bonus' }
+            );
         }
 
         lead = await Lead.findByIdAndUpdate(req.params.id, req.body, {
@@ -139,6 +191,19 @@ exports.exportLeads = async (req, res) => {
         res.header('Content-Type', 'text/csv');
         res.attachment('leads-export.csv');
         res.status(200).send(csv);
+    } catch (err) {
+        res.status(400).json({ success: false, error: err.message });
+    }
+};
+
+// @desc    Delete lead
+// @route   DELETE /api/leads/:id
+// @access  Private (Admin)
+exports.deleteLead = async (req, res) => {
+    try {
+        const lead = await Lead.findByIdAndDelete(req.params.id);
+        if (!lead) return res.status(404).json({ success: false, message: 'Lead not found' });
+        res.status(200).json({ success: true, data: {} });
     } catch (err) {
         res.status(400).json({ success: false, error: err.message });
     }
