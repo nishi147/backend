@@ -97,24 +97,70 @@ exports.getLead = async (req, res) => {
 // @access  Public
 exports.createLead = async (req, res) => {
     try {
-        const lead = await Lead.create(req.body);
+        const { email, phone } = req.body;
+        
+        // 1. Prevent Duplicates: Update if exists
+        let lead;
+        if (email || phone) {
+            const query = [];
+            if (email) query.push({ email });
+            if (phone) query.push({ phone });
+            
+            lead = await Lead.findOne({ $or: query });
+        }
+
+        if (lead) {
+            // Update existing lead with new info but keep assignedTo/status
+            const updateParams = { $set: {}, $push: {} };
+            
+            for (const key of Object.keys(req.body)) {
+                if (key === 'notes') {
+                    // Push new notes if provided
+                    if (Array.isArray(req.body.notes)) {
+                         updateParams.$push.notes = { $each: req.body.notes };
+                    }
+                } else if (key !== 'assignedTo' && key !== 'status') {
+                    updateParams.$set[key] = req.body[key];
+                }
+            }
+            
+            if (Object.keys(updateParams.$push).length === 0) delete updateParams.$push;
+            if (Object.keys(updateParams.$set).length === 0) delete updateParams.$set;
+
+            lead = await Lead.findByIdAndUpdate(lead._id, updateParams, { new: true });
+        } else {
+            // 2. Auto Assign Sales
+            const User = require('../models/User');
+            const salesUsers = await User.find({ role: 'sales' });
+            
+            if (salesUsers.length > 0) {
+                // simple round robin or random assign
+                const randomSales = salesUsers[Math.floor(Math.random() * salesUsers.length)];
+                req.body.assignedTo = randomSales._id;
+            }
+
+            lead = await Lead.create(req.body);
+        }
 
         // Handle Referral Logic properly based on the schema
-        if (lead.referralCode) {
+        if (req.body.referralCode && lead) {
             const User = require('../models/User');
             const Referral = require('../models/Referral');
             
             // Find referrer user by code
-            const referrerUser = await User.findOne({ referralCode: lead.referralCode.toUpperCase() });
+            const referrerUser = await User.findOne({ referralCode: req.body.referralCode.toUpperCase() });
             
             if (referrerUser) {
-                // Create a referral tracking doc for this lead
-                await Referral.create({
-                    referrer: referrerUser._id,
-                    referredLead: lead._id,
-                    status: 'Pending',
-                    reward: 'Standard'
-                });
+                // Create a referral tracking doc for this lead (if not exists)
+                const existingRef = await Referral.findOne({ referredLead: lead._id });
+                if (!existingRef) {
+                    await Referral.create({
+                        referrer: referrerUser._id,
+                        referredLead: lead._id,
+                        status: 'Pending',
+                        reward: 'Standard'
+                    });
+                }
             }
         }
 
