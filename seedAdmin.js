@@ -14,16 +14,18 @@ const seedAdmin = async () => {
 
         const adminExists = await User.findOne({ email: 'admin@ruzann.com' });
         if (adminExists) {
-            console.log('Admin already exists. Updating password...');
-            adminExists.password = '@SAruzann#786';
+            console.log('Admin already exists. Updating credentials...');
+            adminExists.password = process.env.ADMIN_PASSWORD || '@SAruzann#786';
             adminExists.role = 'admin';
             adminExists.isApprovedTeacher = true;
+            adminExists.phone = process.env.ADMIN_PHONE || '9111111111';
             await adminExists.save();
         } else {
             await User.create({
                 name: 'Super Admin',
                 email: 'admin@ruzann.com',
-                password: '@SAruzann#786',
+                password: process.env.ADMIN_PASSWORD || '@SAruzann#786',
+                phone: process.env.ADMIN_PHONE || '9111111111',
                 role: 'admin',
                 isApprovedTeacher: true
             });
