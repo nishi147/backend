@@ -15,7 +15,7 @@ const seedAdmin = async () => {
         const adminExists = await User.findOne({ email: 'admin@ruzann.com' });
         if (adminExists) {
             console.log('Admin already exists. Updating password...');
-            adminExists.password = 'admin123';
+            adminExists.password = '@SAruzann#786';
             adminExists.role = 'admin';
             adminExists.isApprovedTeacher = true;
             await adminExists.save();
@@ -23,7 +23,7 @@ const seedAdmin = async () => {
             await User.create({
                 name: 'Super Admin',
                 email: 'admin@ruzann.com',
-                password: 'admin123',
+                password: '@SAruzann#786',
                 role: 'admin',
                 isApprovedTeacher: true
             });
