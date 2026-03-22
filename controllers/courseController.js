@@ -106,7 +106,8 @@ exports.createCourse = async (req, res) => {
 // @access  Private (Teacher)
 exports.getTeacherCourses = async (req, res) => {
     try {
-        const courses = await Course.find({ teacher: req.user.id }).populate('category');
+        const filter = req.user.role === 'admin' ? {} : { teacher: req.user.id };
+        const courses = await Course.find(filter).populate('category');
         res.status(200).json({ success: true, data: courses });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Server error' });

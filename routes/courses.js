@@ -17,7 +17,7 @@ const upload = require('../utils/upload');
 const router = express.Router();
 
 // Teacher Routes
-router.get('/teacher/my-courses', protect, authorize('teacher'), getTeacherCourses);
+router.get('/teacher/my-courses', protect, authorize('teacher', 'admin'), getTeacherCourses);
 
 // Student Routes
 router.get('/student/my-courses', protect, authorize('student'), getStudentCourses);
