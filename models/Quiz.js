@@ -11,7 +11,8 @@ const QuizSchema = new mongoose.Schema({
     title: { type: String, required: true },
     course: { type: mongoose.Schema.Types.ObjectId, ref: 'Course', required: true },
     questions: [QuestionSchema],
-    passingScore: { type: Number, default: 70 }
+    passingScore: { type: Number, default: 70 },
+    creator: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }
 }, { timestamps: true });
 
 module.exports = mongoose.model('Quiz', QuizSchema);
