@@ -31,6 +31,10 @@ const WorkshopSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Please add a venue or online link'],
   },
+  meetingLink: {
+    type: String,
+    trim: true,
+  },
 }, {
   timestamps: true,
 });

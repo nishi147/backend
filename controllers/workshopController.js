@@ -72,3 +72,18 @@ exports.deleteWorkshop = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };
+
+// @desc    Get logged in user's booked workshops
+// @route   GET /api/workshops/my-workshops
+// @access  Private
+exports.getMyWorkshops = async (req, res) => {
+  try {
+    const WorkshopBooking = require('../models/WorkshopBooking');
+    const bookings = await WorkshopBooking.find({ user: req.user.id })
+                                          .populate('workshop')
+                                          .sort({ createdAt: -1 });
+    res.status(200).json({ success: true, count: bookings.length, data: bookings });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};

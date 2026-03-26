@@ -285,11 +285,14 @@ exports.verifyWorkshopPayment = async (req, res) => {
             });
 
             // Send Confirmation Email
+            const meetingDetailsTxt = workshop.meetingLink ? `\nMeeting Link: ${workshop.meetingLink}\nMake sure to save this link to join the session!` : '';
+            const meetingDetailsHtml = workshop.meetingLink ? `<p><strong>Meeting Link:</strong> <a href="${workshop.meetingLink}">${workshop.meetingLink}</a></p><p>Make sure to save this link to join the session!</p>` : '';
+
             await sendEmail({
                 email: req.user.email,
                 subject: `Your Seat is Booked for ${workshop.title}! 🎟️`,
-                message: `Hi ${req.user.name},\n\nPayment successful! Your seat is now booked for the workshop: ${workshop.title}.\n\nDate: ${new Date(workshop.date).toLocaleDateString()}\nVenue: ${workshop.venue}\n\nSee you there!\nTeam RUZANN`,
-                html: `<h1>Your Seat is Booked! 🎟️</h1><p>Hi ${req.user.name},</p><p>Payment successful! Your seat is now booked for the workshop: <strong>${workshop.title}</strong>.</p><p><strong>Date:</strong> ${new Date(workshop.date).toLocaleDateString()}<br><strong>Venue:</strong> ${workshop.venue}</p><p>See you there!<br>Team RUZANN</p>`
+                message: `Hi ${req.user.name},\n\nPayment successful! Your seat is now booked for the workshop: ${workshop.title}.\n\nDate: ${new Date(workshop.date).toLocaleDateString()}\nVenue: ${workshop.venue}${meetingDetailsTxt}\n\nSee you there!\nTeam RUZANN`,
+                html: `<h1>Your Seat is Booked! 🎟️</h1><p>Hi ${req.user.name},</p><p>Payment successful! Your seat is now booked for the workshop: <strong>${workshop.title}</strong>.</p><p><strong>Date:</strong> ${new Date(workshop.date).toLocaleDateString()}<br><strong>Venue:</strong> ${workshop.venue}</p>${meetingDetailsHtml}<p>See you there!<br>Team RUZANN</p>`
             });
 
             return res.status(200).json({ success: true, message: "Workshop payment verified successfully" });

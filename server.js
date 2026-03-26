@@ -65,30 +65,59 @@ const { getApprovedTeachers } = require('./controllers/userController');
 
 const app = express();
 
-// Database Connection (Cached for Serverless Stability)
-let isConnected = false;
+// Database Connection (Cached for Serverless/Vercel)
+let cached = global.mongoose;
 
-const connectDB = async () => {
-    if (isConnected) {
-        console.log('MongoDB is already connected');
-        return;
-    }
+if (!cached) {
+  cached = global.mongoose = { conn: null, promise: null };
+}
+
+async function connectDB() {
+  if (cached.conn) {
+    return cached.conn;
+  }
+
+  if (!cached.promise) {
+    const opts = {
+      family: 4, // IPv4 Force
+      serverSelectionTimeoutMS: 20000,
+      maxPoolSize: 10,
+    };
+
+    console.log('--- Connecting to MongoDB (New Connection) ---');
+    cached.promise = mongoose.connect(process.env.MONGODB_URI, opts).then((mongoose) => {
+      console.log('--- MongoDB Connected Successfully ---');
+      return mongoose;
+    });
+  }
+
+  try {
+    cached.conn = await cached.promise;
+  } catch (e) {
+    cached.promise = null;
+    console.error('--- MongoDB Connection Failed ---', e);
+    throw e;
+  }
+
+  return cached.conn;
+}
+
+// Middleware to ensure DB is connected before every request
+app.use(async (req, res, next) => {
     try {
-        const db = await mongoose.connect(process.env.MONGODB_URI, {
-            family: 4,
-            serverSelectionTimeoutMS: 10000,
-            maxPoolSize: 10 // Prevent exhausting Free Tier connections
+        await connectDB();
+        next();
+    } catch (error) {
+        res.status(500).json({ 
+            success: false, 
+            message: 'Database connection failed',
+            error: error.message 
         });
-        isConnected = db.connections[0].readyState === 1;
-        console.log('Connected to MongoDB');
-    } catch (err) {
-        console.error('MongoDB connection error:', err);
-        // Do not crash server, let routes handle 500 logic safely against DB checks
     }
-};
+});
 
-// Initialize connection
-connectDB();
+// Initial boot connection
+connectDB().catch(err => console.error("Initial Boot DB Error:", err));
 
 // Middleware
 app.use(cors({
