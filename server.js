@@ -79,9 +79,12 @@ async function connectDB() {
 
   if (!cached.promise) {
     const opts = {
-      family: 4, // IPv4 Force
-      serverSelectionTimeoutMS: 20000,
+      family: 4, 
+      serverSelectionTimeoutMS: 30000, // Increased for serverless cold starts
       maxPoolSize: 10,
+      minPoolSize: 2, // Keep some connections warm
+      socketTimeoutMS: 45000,
+      connectTimeoutMS: 30000,
     };
 
     console.log('--- Connecting to MongoDB (New Connection) ---');
