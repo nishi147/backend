@@ -114,13 +114,22 @@ exports.approveStudent = async (req, res) => {
 // @access  Private/Admin
 exports.getAnalytics = async (req, res) => {
     try {
-        const studentCount = await User.countDocuments({ role: 'student' });
-        const teacherCount = await User.countDocuments({ role: 'teacher' });
-        const courseCount = await Course.countDocuments();
-        const enrollmentCount = await Enrollment.countDocuments();
-        
-        const payments = await Payment.find({ status: 'success' });
-        const revenue = payments.reduce((acc, curr) => acc + curr.amount, 0);
+        const [
+            studentCount,
+            teacherCount,
+            courseCount,
+            enrollmentCount,
+            revenueData
+        ] = await Promise.all([
+            User.countDocuments({ role: 'student' }),
+            User.countDocuments({ role: 'teacher' }),
+            Course.countDocuments(),
+            Enrollment.countDocuments(),
+            Payment.aggregate([
+                { $match: { status: 'success' } },
+                { $group: { _id: null, totalRevenue: { $sum: '$amount' } } }
+            ])
+        ]);
 
         res.status(200).json({
             success: true,
@@ -129,7 +138,7 @@ exports.getAnalytics = async (req, res) => {
                 totalTeachers: teacherCount,
                 totalCourses: courseCount,
                 totalEnrollments: enrollmentCount,
-                totalRevenue: revenue
+                totalRevenue: revenueData.length > 0 ? revenueData[0].totalRevenue : 0
             }
         });
     } catch (error) {

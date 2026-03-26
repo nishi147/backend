@@ -10,98 +10,103 @@ const mongoose = require('mongoose');
 // @access  Private (Admin)
 exports.getSalesAnalytics = async (req, res) => {
     try {
-        const totalLeads = await Lead.countDocuments();
-        const convertedLeads = await Lead.countDocuments({ status: 'Converted' });
-        
-        const revenueData = await Lead.aggregate([
-            { $match: { status: 'Converted' } },
-            { $group: { _id: null, totalRevenue: { $sum: '$revenue' } } }
-        ]);
-
-        const sourceStats = await Lead.aggregate([
-            { $group: { _id: '$source', count: { $sum: 1 } } }
-        ]);
-
-        const statusStats = await Lead.aggregate([
-            { $group: { _id: '$status', count: { $sum: 1 } } }
-        ]);
-
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const tomorrow = new Date(today);
         tomorrow.setDate(tomorrow.getDate() + 1);
 
-        const followUpToday = await Lead.countDocuments({
-            followUpDate: { $gte: today, $lt: tomorrow }
-        });
-
         const sixMonthsAgo = new Date();
         sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
-        const leadsOverTime = await Lead.aggregate([
-            { $match: { createdAt: { $gte: sixMonthsAgo } } },
-            {
-                $group: {
-                    _id: { 
-                        year: { $year: '$createdAt' }, 
-                        month: { $month: '$createdAt' } 
-                    },
-                    count: { $sum: 1 }
-                }
-            },
-            { $sort: { '_id.year': 1, '_id.month': 1 } }
-        ]);
-
-        const revenueOverTime = await Lead.aggregate([
-            { $match: { status: 'Converted', convertedAt: { $gte: sixMonthsAgo } } },
-            {
-                $group: {
-                    _id: { 
-                        year: { $year: '$convertedAt' }, 
-                        month: { $month: '$convertedAt' } 
-                    },
-                    revenue: { $sum: '$revenue' }
-                }
-            },
-            { $sort: { '_id.year': 1, '_id.month': 1 } }
-        ]);
-
-        // New Coupon & Sales Metrics
-        const couponStats = await Sale.aggregate([
-            { $group: { _id: '$couponCode', usageCount: { $sum: 1 }, totalRevenue: { $sum: '$finalAmount' } } },
-            { $sort: { usageCount: -1 } },
-            { $limit: 5 }
-        ]);
-
-        const salesUserPerformance = await Sale.aggregate([
-            {
-                $group: {
-                    _id: '$salesUserId',
-                    totalSales: { $sum: 1 },
-                    totalRevenue: { $sum: '$finalAmount' }
-                }
-            },
-            {
-                $lookup: {
-                    from: 'users',
-                    localField: '_id',
-                    foreignField: '_id',
-                    as: 'salesUser'
-                }
-            },
-            { $unwind: '$salesUser' },
-            {
-                $project: {
-                    name: '$salesUser.name',
-                    totalSales: 1,
-                    totalRevenue: 1
-                }
-            },
-            { $sort: { totalRevenue: -1 } }
-        ]);
-
-        const revenueFromCoupons = await Sale.aggregate([
-            { $group: { _id: null, total: { $sum: '$finalAmount' } } }
+        // Run all 11 queries in parallel
+        const [
+            totalLeads,
+            convertedLeads,
+            revenueData,
+            sourceStats,
+            statusStats,
+            followUpToday,
+            leadsOverTime,
+            revenueOverTime,
+            couponStats,
+            salesUserPerformance,
+            revenueFromCoupons
+        ] = await Promise.all([
+            Lead.countDocuments(),
+            Lead.countDocuments({ status: 'Converted' }),
+            Lead.aggregate([
+                { $match: { status: 'Converted' } },
+                { $group: { _id: null, totalRevenue: { $sum: '$revenue' } } }
+            ]),
+            Lead.aggregate([
+                { $group: { _id: '$source', count: { $sum: 1 } } }
+            ]),
+            Lead.aggregate([
+                { $group: { _id: '$status', count: { $sum: 1 } } }
+            ]),
+            Lead.countDocuments({
+                followUpDate: { $gte: today, $lt: tomorrow }
+            }),
+            Lead.aggregate([
+                { $match: { createdAt: { $gte: sixMonthsAgo } } },
+                {
+                    $group: {
+                        _id: { 
+                            year: { $year: '$createdAt' }, 
+                            month: { $month: '$createdAt' } 
+                        },
+                        count: { $sum: 1 }
+                    }
+                },
+                { $sort: { '_id.year': 1, '_id.month': 1 } }
+            ]),
+            Lead.aggregate([
+                { $match: { status: 'Converted', convertedAt: { $gte: sixMonthsAgo } } },
+                {
+                    $group: {
+                        _id: { 
+                            year: { $year: '$convertedAt' }, 
+                            month: { $month: '$convertedAt' } 
+                        },
+                        revenue: { $sum: '$revenue' }
+                    }
+                },
+                { $sort: { '_id.year': 1, '_id.month': 1 } }
+            ]),
+            Sale.aggregate([
+                { $group: { _id: '$couponCode', usageCount: { $sum: 1 }, totalRevenue: { $sum: '$finalAmount' } } },
+                { $sort: { usageCount: -1 } },
+                { $limit: 5 }
+            ]),
+            Sale.aggregate([
+                {
+                    $group: {
+                        _id: '$salesUserId',
+                        totalSales: { $sum: 1 },
+                        totalRevenue: { $sum: '$finalAmount' }
+                    }
+                },
+                {
+                    $lookup: {
+                        from: 'users',
+                        localField: '_id',
+                        foreignField: '_id',
+                        as: 'salesUser'
+                    }
+                },
+                { $unwind: '$salesUser' },
+                {
+                    $project: {
+                        name: '$salesUser.name',
+                        totalSales: 1,
+                        totalRevenue: 1
+                    }
+                },
+                { $sort: { totalRevenue: -1 } }
+            ]),
+            Sale.aggregate([
+                { $group: { _id: null, total: { $sum: '$finalAmount' } } }
+            ])
         ]);
 
         res.status(200).json({
