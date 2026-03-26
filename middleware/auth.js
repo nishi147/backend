@@ -23,11 +23,10 @@ exports.protect = async (req, res, next) => {
             return res.status(401).json({ success: false, message: 'User not found' });
         }
         
-        next();
-    } catch (err) {
-        console.error("JWT Verification Error: ", err);
-        return res.status(401).json({ success: false, message: 'Not authorize to access this route' });
-    }
+      } catch (err) {
+    console.error("JWT Verification Error: ", err.message, " for token starting with: ", token.substring(0, 10));
+    return res.status(401).json({ success: false, message: 'Not authorize to access this route' });
+  }
 };
 
 // Grant access to specific roles
