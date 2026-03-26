@@ -79,11 +79,47 @@ exports.deleteWorkshop = async (req, res) => {
 exports.getMyWorkshops = async (req, res) => {
   try {
     const WorkshopBooking = require('../models/WorkshopBooking');
-    const bookings = await WorkshopBooking.find({ user: req.user.id })
-                                          .populate('workshop')
-                                          .sort({ createdAt: -1 });
-    res.status(200).json({ success: true, count: bookings.length, data: bookings });
+    const Booking = require('../models/Booking');
+    const User = require('../models/User');
+
+    const user = await User.findById(req.user.id);
+
+    // 1. Fetch specific Workshop Bookings
+    const workshopBookings = await WorkshopBooking.find({ user: req.user.id })
+                                                  .populate('workshop')
+                                                  .sort({ createdAt: -1 });
+
+    // 2. Fetch Intro Trial Bookings (matched by email/phone)
+    const introBookings = await Booking.find({ 
+      $or: [
+        { email: { $regex: new RegExp(`^${user.email}$`, 'i') } },
+        { phone: user.phone }
+      ],
+      status: 'completed'
+    }).sort({ createdAt: -1 });
+
+    // 3. Transform Intro Bookings into a similar format for the frontend
+    const trials = introBookings.map(b => ({
+      _id: b._id,
+      isTrial: true,
+      amount: b.amount,
+      status: b.status, // Added status
+      createdAt: b.createdAt,
+      workshop: {
+        title: "Intro Trial Session",
+        description: "Your first deep-dive into coding & robotics!",
+        date: b.createdAt, // Placeholder date
+        venue: "Online (Standard Trial Link)",
+        meetingLink: "https://zoom.us/j/ruzann-trial-session" // Fallback link
+      }
+    }));
+
+    // Combine both
+    const allBookings = [...workshopBookings, ...trials];
+
+    res.status(200).json({ success: true, count: allBookings.length, data: allBookings });
   } catch (error) {
+    console.error("getMyWorkshops Error:", error);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };

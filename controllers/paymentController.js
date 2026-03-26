@@ -212,11 +212,13 @@ exports.verifyIntroPayment = async (req, res) => {
             });
 
             // Send Confirmation Email for Intro Offer
+            const trialLink = "https://zoom.us/j/ruzann-trial-session";
+            
             await sendEmail({
                 email: email,
                 subject: 'Your RUZANN Adventure Starts Now! 🌟',
-                message: `Hi ${parentName},\n\nPayment of ₹1 successful! We've received your booking for ${studentName}. Our team will contact you shortly with the next steps.\n\nWelcome to the family!\nTeam RUZANN`,
-                html: `<h1>Your RUZANN Adventure Starts Now! 🌟</h1><p>Hi ${parentName},</p><p>Payment of <strong>₹1</strong> successful!</p><p>We've received your booking for <strong>${studentName}</strong> (Age: ${age}). Our team will contact you shortly at ${phone} with the next steps.</p><p>Welcome to the family!<br>Team RUZANN</p>`
+                message: `Hi ${parentName},\n\nPayment of ₹1 successful! We've received your booking for ${studentName}.\n\nMeeting Link: ${trialLink}\nOur team will contact you shortly with the next steps.\n\nWelcome to the family!\nTeam RUZANN`,
+                html: `<h1>Your RUZANN Adventure Starts Now! 🌟</h1><p>Hi ${parentName},</p><p>Payment of <strong>₹1</strong> successful!</p><p>We've received your booking for <strong>${studentName}</strong> (Age: ${age}).</p><p><strong>Meeting Link:</strong> <a href="${trialLink}">${trialLink}</a></p><p>Our team will contact you shortly at ${phone} with the next steps.</p><p>Welcome to the family!<br>Team RUZANN</p>`
             });
 
             return res.status(200).json({ success: true, message: "₹1 Offer Claimed Successfully!" });
