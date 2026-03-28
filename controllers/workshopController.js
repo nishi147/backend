@@ -123,3 +123,107 @@ exports.getMyWorkshops = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };
+
+// ==========================================
+// WORKSHOP SLOT CONTROLLERS
+// ==========================================
+
+const WorkshopSlot = require('../models/WorkshopSlot');
+
+// @desc    Get all slots for a workshop
+// @route   GET /api/workshops/:workshopId/slots
+// @access  Public
+exports.getWorkshopSlots = async (req, res) => {
+  try {
+    const slots = await WorkshopSlot.find({ workshop: req.params.workshopId }).sort({ date: 1, startTime: 1 });
+    res.status(200).json({ success: true, count: slots.length, data: slots });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// @desc    Create a new time slot
+// @route   POST /api/workshops/:workshopId/slots
+// @access  Private (Admin)
+exports.createWorkshopSlot = async (req, res) => {
+  try {
+    const { date, startTime, endTime, capacity } = req.body;
+    
+    // Check for duplicate slot
+    const existingSlot = await WorkshopSlot.findOne({
+      workshop: req.params.workshopId,
+      date: new Date(date).setHours(0,0,0,0), // ignore time for date match
+      startTime
+    });
+
+    // Just let Mongo's unique index handle exact date/startTime/workshop duplicates, 
+    // but a quick check helps with custom errors.
+    
+    let slotData = {
+      workshop: req.params.workshopId,
+      date,
+      startTime,
+      endTime,
+      capacity
+    };
+
+    const slot = await WorkshopSlot.create(slotData);
+    res.status(201).json({ success: true, data: slot });
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(400).json({ success: false, message: 'A slot with this exact date and start time already exists.' });
+    }
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+// @desc    Update a time slot
+// @route   PUT /api/workshops/:workshopId/slots/:slotId
+// @access  Private (Admin)
+exports.updateWorkshopSlot = async (req, res) => {
+  try {
+    let slot = await WorkshopSlot.findById(req.params.slotId);
+    
+    if (!slot) {
+      return res.status(404).json({ success: false, message: 'Slot not found' });
+    }
+
+    if (req.body.capacity && req.body.capacity < slot.bookedCount) {
+      return res.status(400).json({ success: false, message: `Cannot reduce capacity below currently booked seats (${slot.bookedCount}).` });
+    }
+
+    slot = await WorkshopSlot.findByIdAndUpdate(req.params.slotId, req.body, {
+      new: true,
+      runValidators: true,
+    });
+
+    res.status(200).json({ success: true, data: slot });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// @desc    Delete a time slot
+// @route   DELETE /api/workshops/:workshopId/slots/:slotId
+// @access  Private (Admin)
+exports.deleteWorkshopSlot = async (req, res) => {
+  try {
+    const slot = await WorkshopSlot.findById(req.params.slotId);
+    
+    if (!slot) {
+      return res.status(404).json({ success: false, message: 'Slot not found' });
+    }
+
+    if (slot.bookedCount > 0) {
+      return res.status(400).json({ success: false, message: 'Cannot delete a slot that already has bookings.' });
+    }
+
+    await slot.deleteOne();
+    res.status(200).json({ success: true, data: {} });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};

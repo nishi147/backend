@@ -11,12 +11,13 @@ const sendTokenResponse = (user, statusCode, res) => {
 
     const options = {
         expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-        httpOnly: true
+        httpOnly: true,
+        sameSite: 'none',
+        secure: true // Always secure for cross-site cookies
     };
 
-    if (process.env.NODE_ENV === 'production') {
-        options.secure = true;
-    }
+    // Note: sameSite: 'none' requires secure: true. 
+    // This ensures cookies work across ruzann.com and the Vercel backend.
 
     res
         .status(statusCode)

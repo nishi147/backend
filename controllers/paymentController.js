@@ -236,11 +236,22 @@ exports.verifyIntroPayment = async (req, res) => {
 // @access  Private (Student)
 exports.createWorkshopOrder = async (req, res) => {
     try {
-        const { workshopId } = req.body;
+        const { workshopId, slotId } = req.body;
         
         const workshop = await Workshop.findById(workshopId);
         if (!workshop) {
             return res.status(404).json({ success: false, message: 'Workshop not found' });
+        }
+
+        if (slotId) {
+            const WorkshopSlot = require('../models/WorkshopSlot');
+            const slot = await WorkshopSlot.findById(slotId);
+            if (!slot) {
+                return res.status(404).json({ success: false, message: 'Time slot not found' });
+            }
+            if (slot.capacity <= slot.bookedCount) {
+                return res.status(400).json({ success: false, message: 'This time slot is fully booked.' });
+            }
         }
 
         const amount = workshop.price * 100; // Razorpay expects amount in paise
@@ -265,7 +276,7 @@ exports.createWorkshopOrder = async (req, res) => {
 // @access  Private (Student)
 exports.verifyWorkshopPayment = async (req, res) => {
     try {
-        const { razorpay_order_id, razorpay_payment_id, razorpay_signature, workshopId } = req.body;
+        const { razorpay_order_id, razorpay_payment_id, razorpay_signature, workshopId, slotId } = req.body;
 
         const sign = razorpay_order_id + "|" + razorpay_payment_id;
         const expectedSign = crypto
@@ -280,11 +291,27 @@ exports.verifyWorkshopPayment = async (req, res) => {
             await WorkshopBooking.create({
                 user: req.user.id,
                 workshop: workshopId,
+                slotId: slotId || undefined,
                 paymentId: razorpay_payment_id,
                 orderId: razorpay_order_id,
                 amount: workshop.price,
                 status: 'success'
             });
+
+            // Handle Slot Booked Count
+            let slotDetailsTxt = '';
+            let slotDetailsHtml = '';
+            if (slotId) {
+                const WorkshopSlot = require('../models/WorkshopSlot');
+                const slot = await WorkshopSlot.findByIdAndUpdate(slotId, {
+                    $inc: { bookedCount: 1 }
+                }, { new: true });
+                
+                if (slot) {
+                    slotDetailsTxt = `\nTime: ${slot.startTime} to ${slot.endTime}`;
+                    slotDetailsHtml = `<br><strong>Time:</strong> ${slot.startTime} to ${slot.endTime}`;
+                }
+            }
 
             // Send Confirmation Email
             const meetingDetailsTxt = workshop.meetingLink ? `\nMeeting Link: ${workshop.meetingLink}\nMake sure to save this link to join the session!` : '';
@@ -293,8 +320,8 @@ exports.verifyWorkshopPayment = async (req, res) => {
             await sendEmail({
                 email: req.user.email,
                 subject: `Your Seat is Booked for ${workshop.title}! 🎟️`,
-                message: `Hi ${req.user.name},\n\nPayment successful! Your seat is now booked for the workshop: ${workshop.title}.\n\nDate: ${new Date(workshop.date).toLocaleDateString()}\nVenue: ${workshop.venue}${meetingDetailsTxt}\n\nSee you there!\nTeam RUZANN`,
-                html: `<h1>Your Seat is Booked! 🎟️</h1><p>Hi ${req.user.name},</p><p>Payment successful! Your seat is now booked for the workshop: <strong>${workshop.title}</strong>.</p><p><strong>Date:</strong> ${new Date(workshop.date).toLocaleDateString()}<br><strong>Venue:</strong> ${workshop.venue}</p>${meetingDetailsHtml}<p>See you there!<br>Team RUZANN</p>`
+                message: `Hi ${req.user.name},\n\nPayment successful! Your seat is now booked for the workshop: ${workshop.title}.\n\nDate: ${new Date(workshop.date).toLocaleDateString()}${slotDetailsTxt}\nVenue: ${workshop.venue}${meetingDetailsTxt}\n\nSee you there!\nTeam RUZANN`,
+                html: `<h1>Your Seat is Booked! 🎟️</h1><p>Hi ${req.user.name},</p><p>Payment successful! Your seat is now booked for the workshop: <strong>${workshop.title}</strong>.</p><p><strong>Date:</strong> ${new Date(workshop.date).toLocaleDateString()}${slotDetailsHtml}<br><strong>Venue:</strong> ${workshop.venue}</p>${meetingDetailsHtml}<p>See you there!<br>Team RUZANN</p>`
             });
 
             return res.status(200).json({ success: true, message: "Workshop payment verified successfully" });
