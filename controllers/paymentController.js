@@ -233,11 +233,15 @@ exports.verifyIntroPayment = async (req, res) => {
 
 // @desc    Create Razorpay Order for Workshop
 // @route   POST /api/payments/workshop-order
-// @access  Private (Student)
+// @access  Private (Authenticated)
 exports.createWorkshopOrder = async (req, res) => {
     try {
         const { workshopId, slotId } = req.body;
         
+        if (!workshopId) {
+            return res.status(400).json({ success: false, message: 'Workshop ID is required' });
+        }
+
         const workshop = await Workshop.findById(workshopId);
         if (!workshop) {
             return res.status(404).json({ success: false, message: 'Workshop not found' });
@@ -250,33 +254,39 @@ exports.createWorkshopOrder = async (req, res) => {
                 return res.status(404).json({ success: false, message: 'Time slot not found' });
             }
             if (slot.capacity <= slot.bookedCount) {
-                return res.status(400).json({ success: false, message: 'This time slot is fully booked.' });
+                return res.status(400).json({ success: false, message: 'Slot is already full' });
             }
         }
 
-        const amount = workshop.price * 100; // Razorpay expects amount in paise
-
         const options = {
-            amount: amount,
+            amount: Math.round(workshop.price * 100), // Ensure integer paise
             currency: 'INR',
-            receipt: `receipt_workshop_${Date.now()}`,
+            receipt: `workshop_order_${Date.now()}`,
+            notes: {
+                workshopId,
+                slotId: slotId || '',
+                userId: req.user?.id
+            }
         };
 
         const order = await razorpay.orders.create(options);
-
         res.status(200).json({ success: true, data: order });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ success: false, message: 'Server error' });
+        console.error("Workshop Order Error:", error);
+        res.status(500).json({ success: false, message: 'Failed to create workshop order' });
     }
 };
 
 // @desc    Verify Workshop Payment
 // @route   POST /api/payments/workshop-verify
-// @access  Private (Student)
+// @access  Private (Authenticated)
 exports.verifyWorkshopPayment = async (req, res) => {
     try {
         const { razorpay_order_id, razorpay_payment_id, razorpay_signature, workshopId, slotId } = req.body;
+
+        if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+            return res.status(400).json({ success: false, message: "Missing payment identifiers" });
+        }
 
         const sign = razorpay_order_id + "|" + razorpay_payment_id;
         const expectedSign = crypto
@@ -284,52 +294,53 @@ exports.verifyWorkshopPayment = async (req, res) => {
             .update(sign.toString())
             .digest("hex");
 
-        if (razorpay_signature === expectedSign) {
-            const workshop = await Workshop.findById(workshopId);
-            
-            // Create workshop booking record
-            await WorkshopBooking.create({
-                user: req.user.id,
-                workshop: workshopId,
-                slotId: slotId || undefined,
-                paymentId: razorpay_payment_id,
-                orderId: razorpay_order_id,
-                amount: workshop.price,
-                status: 'success'
-            });
-
-            // Handle Slot Booked Count
-            let slotDetailsTxt = '';
-            let slotDetailsHtml = '';
-            if (slotId) {
-                const WorkshopSlot = require('../models/WorkshopSlot');
-                const slot = await WorkshopSlot.findByIdAndUpdate(slotId, {
-                    $inc: { bookedCount: 1 }
-                }, { new: true });
-                
-                if (slot) {
-                    slotDetailsTxt = `\nTime: ${slot.startTime} to ${slot.endTime}`;
-                    slotDetailsHtml = `<br><strong>Time:</strong> ${slot.startTime} to ${slot.endTime}`;
-                }
-            }
-
-            // Send Confirmation Email
-            const meetingDetailsTxt = workshop.meetingLink ? `\nMeeting Link: ${workshop.meetingLink}\nMake sure to save this link to join the session!` : '';
-            const meetingDetailsHtml = workshop.meetingLink ? `<p><strong>Meeting Link:</strong> <a href="${workshop.meetingLink}">${workshop.meetingLink}</a></p><p>Make sure to save this link to join the session!</p>` : '';
-
-            await sendEmail({
-                email: req.user.email,
-                subject: `Your Seat is Booked for ${workshop.title}! 🎟️`,
-                message: `Hi ${req.user.name},\n\nPayment successful! Your seat is now booked for the workshop: ${workshop.title}.\n\nDate: ${new Date(workshop.date).toLocaleDateString()}${slotDetailsTxt}\nVenue: ${workshop.venue}${meetingDetailsTxt}\n\nSee you there!\nTeam RUZANN`,
-                html: `<h1>Your Seat is Booked! 🎟️</h1><p>Hi ${req.user.name},</p><p>Payment successful! Your seat is now booked for the workshop: <strong>${workshop.title}</strong>.</p><p><strong>Date:</strong> ${new Date(workshop.date).toLocaleDateString()}${slotDetailsHtml}<br><strong>Venue:</strong> ${workshop.venue}</p>${meetingDetailsHtml}<p>See you there!<br>Team RUZANN</p>`
-            });
-
-            return res.status(200).json({ success: true, message: "Workshop payment verified successfully" });
-        } else {
-            return res.status(400).json({ success: false, message: "Invalid signature sent!" });
+        if (razorpay_signature !== expectedSign) {
+            return res.status(400).json({ success: false, message: "Invalid payment signature" });
         }
+
+        const workshop = await Workshop.findById(workshopId);
+        if (!workshop) {
+            return res.status(404).json({ success: false, message: "Workshop details not found" });
+        }
+        
+        // Create workshop booking record
+        await WorkshopBooking.create({
+            user: req.user.id,
+            workshop: workshopId,
+            slotId: slotId || undefined,
+            paymentId: razorpay_payment_id,
+            orderId: razorpay_order_id,
+            amount: workshop.price,
+            status: 'success'
+        });
+
+        // Handle Slot Booked Count
+        let slotDetailsTxt = '';
+        let slotDetailsHtml = '';
+        if (slotId) {
+            const WorkshopSlot = require('../models/WorkshopSlot');
+            const slot = await WorkshopSlot.findByIdAndUpdate(slotId, {
+                $inc: { bookedCount: 1 }
+            }, { new: true });
+            
+            if (slot) {
+                slotDetailsTxt = `\nTime: ${slot.startTime} to ${slot.endTime}`;
+                slotDetailsHtml = `<br><strong>Time:</strong> ${slot.startTime} to ${slot.endTime}`;
+            }
+        }
+
+        // Send Confirmation Email
+        await sendEmail({
+            email: req.user.email,
+            subject: `Seat Confirmed: ${workshop.title}! 🎟️`,
+            message: `Hi ${req.user.name},\n\nYour seat is booked for: ${workshop.title}.\nDate: ${new Date(workshop.date).toLocaleDateString()}${slotDetailsTxt}\nVenue: ${workshop.venue}\n\nSee you there!\nTeam RUZANN`,
+            html: `<h1>Seat Confirmed! 🎟️</h1><p>Hi ${req.user.name},</p><p>You are booked for: <strong>${workshop.title}</strong>.</p><p><strong>Date:</strong> ${new Date(workshop.date).toLocaleDateString()}${slotDetailsHtml}<br><strong>Venue:</strong> ${workshop.venue}</p><p>See you there!<br>Team RUZANN</p>`
+        });
+
+        return res.status(200).json({ success: true, message: "Workshop booking confirmed" });
+
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ success: false, message: 'Server error' });
+        console.error("Workshop Verification Error:", error);
+        res.status(500).json({ success: false, message: 'Internal server error during verification' });
     }
 };

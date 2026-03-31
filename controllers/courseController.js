@@ -55,12 +55,22 @@ exports.createCourse = async (req, res) => {
     const rating = Number(req.body?.rating) || 5.0;
     const studentsEnrolled = Number(req.body?.studentsEnrolled) || 0;
 
-    // ✅ Validation
-    if (!title || !category) {
+    // ✅ Enhanced Validation
+    if (!title || !category || !description) {
       return res.status(400).json({
         success: false,
-        message: "Missing required fields"
+        message: "Please provide title, category, and description"
       });
+    }
+
+    const sessions = Number(req.body?.numberOfSessions);
+    const price = Number(req.body?.pricePerSession);
+
+    if (isNaN(sessions) || sessions < 1) {
+      return res.status(400).json({ success: false, message: "Valid number of sessions is required" });
+    }
+    if (isNaN(price)) {
+      return res.status(400).json({ success: false, message: "Price per session is required" });
     }
 
     // ✅ Thumbnail handling (URL only)
@@ -73,9 +83,9 @@ exports.createCourse = async (req, res) => {
       description,
       thumbnail,
       teacher: req.user?.id,
-      numberOfSessions,
-      pricePerSession,
-      totalCoursePrice: numberOfSessions * pricePerSession,
+      numberOfSessions: sessions,
+      pricePerSession: price,
+      totalCoursePrice: sessions * price,
       ageGroup,
       courseType,
       rating,

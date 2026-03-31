@@ -12,7 +12,7 @@ exports.protect = async (req, res, next) => {
     }
 
     if (!token) {
-        return res.status(401).json({ success: false, message: 'Not authorize to access this route' });
+        return res.status(401).json({ success: false, message: 'Not authorized to access this route' });
     }
 
     try {
@@ -20,13 +20,13 @@ exports.protect = async (req, res, next) => {
         req.user = await User.findById(decoded.id);
         
         if (!req.user) {
-            return res.status(401).json({ success: false, message: 'User not found' });
+            return res.status(401).json({ success: false, message: 'Account no longer exists' });
         }
         
         next();
       } catch (err) {
-    console.error("JWT Verification Error: ", err.message, " for token starting with: ", token.substring(0, 10));
-    return res.status(401).json({ success: false, message: 'Not authorize to access this route' });
+    console.error("JWT Verification Error: ", err.message);
+    return res.status(401).json({ success: false, message: 'Session expired or invalid, please login again' });
   }
 };
 
@@ -36,7 +36,7 @@ exports.authorize = (...roles) => {
         if (!roles.includes(req.user.role)) {
             return res.status(403).json({ 
                 success: false, 
-                message: `User role ${req.user.role} is not authorized to access this route`
+                message: `Access denied: Role '${req.user.role}' is not authorized for this action`
             });
         }
         next();
