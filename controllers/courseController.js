@@ -77,6 +77,21 @@ exports.createCourse = async (req, res) => {
     const thumbnail = req.body?.thumbnail || "";
 
     // ✅ SAFE DATA (NO SPREAD)
+    console.log("Creation Logic - isPublished Source:", req.body?.isPublished);
+    console.log("Creation Logic - isApproved Source:", req.body?.isApproved);
+    console.log("User Role:", req.user?.role);
+
+    const isPublished = req.body?.isPublished !== undefined ? 
+      (typeof req.body.isPublished === 'string' ? req.body.isPublished === 'true' : Boolean(req.body.isPublished)) : 
+      (req.user?.role === 'admin' ? true : false);
+
+    const isApproved = req.body?.isApproved !== undefined ? 
+      (typeof req.body.isApproved === 'string' ? req.body.isApproved === 'true' : Boolean(req.body.isApproved)) : 
+      (req.user?.role === 'admin' ? true : false);
+
+    console.log("Calculated isPublished:", isPublished);
+    console.log("Calculated isApproved:", isApproved);
+
     const courseData = {
       title,
       category,
@@ -89,7 +104,10 @@ exports.createCourse = async (req, res) => {
       ageGroup,
       courseType,
       rating,
-      studentsEnrolled
+      studentsEnrolled,
+      isPublished,
+      isApproved,
+      modules: req.body?.modules || []
     };
 
     const course = await Course.create(courseData);
@@ -185,7 +203,15 @@ exports.updateCourse = async (req, res) => {
         }
 
         // 6. DB Operation
-        course = await Course.findByIdAndUpdate(req.params.id, req.body, {
+        const updateData = { ...req.body };
+        if (req.user?.role === 'admin' && updateData.isPublished === undefined && course.isPublished === false) {
+           updateData.isPublished = true;
+        }
+        if (req.user?.role === 'admin' && updateData.isApproved === undefined && course.isApproved === false) {
+           updateData.isApproved = true;
+        }
+
+        course = await Course.findByIdAndUpdate(req.params.id, updateData, {
             new: true,
             runValidators: true
         });
@@ -245,7 +271,7 @@ exports.getAllCoursesAdmin = async (req, res) => {
 
 exports.approveCourse = async (req, res) => {
     try {
-        const course = await Course.findByIdAndUpdate(req.params.id, { isApproved: true }, { new: true });
+        const course = await Course.findByIdAndUpdate(req.params.id, { isApproved: true, isPublished: true }, { new: true });
         res.status(200).json({ success: true, data: course });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Server error' });
