@@ -28,12 +28,12 @@ router.put('/admin/approve/:id', protect, authorize('admin'), approveCourse);
 
 // Public Routes
 router.get('/', getCourses);
-router.post('/', protect, authorize('teacher', 'admin'), createCourse);
+router.post('/', protect, authorize('teacher', 'admin'), upload.single('thumbnail'), createCourse);
 
 
 router.route('/:id')
     .get(getCourse)
-    .put(protect, authorize('teacher', 'admin'), updateCourse)
+    .put(protect, authorize('teacher', 'admin'), upload.single('thumbnail'), updateCourse)
     .delete(protect, authorize('teacher', 'admin'), deleteCourse);
 
 module.exports = router;

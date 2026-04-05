@@ -12,6 +12,7 @@ const {
   deleteWorkshopSlot
 } = require('../controllers/workshopController');
 const { protect, authorize } = require('../middleware/auth');
+const upload = require('../utils/upload');
 
 const router = express.Router();
 
@@ -28,11 +29,11 @@ router.route('/:workshopId/slots/:slotId')
 
 router.route('/')
   .get(getWorkshops)
-  .post(protect, authorize('admin'), createWorkshop);
+  .post(protect, authorize('admin', 'teacher'), upload.single('image'), createWorkshop);
 
 router.route('/:id')
   .get(getWorkshop)
-  .put(protect, authorize('admin'), updateWorkshop)
-  .delete(protect, authorize('admin'), deleteWorkshop);
+  .put(protect, authorize('admin', 'teacher'), upload.single('image'), updateWorkshop)
+  .delete(protect, authorize('admin', 'teacher'), deleteWorkshop);
 
 module.exports = router;

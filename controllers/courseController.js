@@ -1,5 +1,6 @@
 const Course = require('../models/Course');
 const Enrollment = require('../models/Enrollment');
+const { uploadToCloudinary } = require('../utils/cloudinary');
 
 // @desc    Get all published approved courses
 // @route   GET /api/courses
@@ -73,8 +74,15 @@ exports.createCourse = async (req, res) => {
       return res.status(400).json({ success: false, message: "Price per session is required" });
     }
 
-    // ✅ Thumbnail handling (URL only)
-    const thumbnail = req.body?.thumbnail || "";
+    // ✅ Thumbnail handling (URL or File)
+    let thumbnail = req.body?.thumbnail || "";
+    if (req.file) {
+      try {
+        thumbnail = await uploadToCloudinary(req.file.buffer, 'ruzann/courses');
+      } catch (err) {
+        console.error("Cloudinary upload failed for course creation:", err);
+      }
+    }
 
     // ✅ SAFE DATA (NO SPREAD)
     console.log("Creation Logic - isPublished Source:", req.body?.isPublished);
@@ -193,7 +201,14 @@ exports.updateCourse = async (req, res) => {
             }
         }
 
-        // 4. Thumbnail is now handled directly via req.body.thumbnail (JSON)
+        // 4. Thumbnail Handling (URL or File)
+        if (req.file) {
+          try {
+            req.body.thumbnail = await uploadToCloudinary(req.file.buffer, 'ruzann/courses');
+          } catch (err) {
+            console.error("Cloudinary upload failed for course update:", err);
+          }
+        }
 
         // 5. Safe Price Recalculation
         if (req.body?.numberOfSessions || req.body?.pricePerSession) {

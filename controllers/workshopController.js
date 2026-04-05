@@ -1,4 +1,5 @@
 const Workshop = require('../models/Workshop');
+const { uploadToCloudinary } = require('../utils/cloudinary');
 
 // @desc    Get all workshops
 // @route   GET /api/workshops
@@ -32,6 +33,13 @@ exports.getWorkshop = async (req, res) => {
 // @access  Private (Admin)
 exports.createWorkshop = async (req, res) => {
   try {
+    if (req.file) {
+      try {
+        req.body.image = await uploadToCloudinary(req.file.buffer, 'ruzann/workshops');
+      } catch (uploadErr) {
+        console.error("Workshop Image Upload Error:", uploadErr);
+      }
+    }
     const workshop = await Workshop.create(req.body);
     res.status(201).json({ success: true, data: workshop });
   } catch (error) {
@@ -44,6 +52,13 @@ exports.createWorkshop = async (req, res) => {
 // @access  Private (Admin)
 exports.updateWorkshop = async (req, res) => {
   try {
+    if (req.file) {
+      try {
+        req.body.image = await uploadToCloudinary(req.file.buffer, 'ruzann/workshops');
+      } catch (uploadErr) {
+        console.error("Workshop Image Update Error:", uploadErr);
+      }
+    }
     const workshop = await Workshop.findByIdAndUpdate(req.params.id, req.body, {
       new: true,
       runValidators: true,

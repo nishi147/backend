@@ -143,6 +143,8 @@ app.use('/api/courses', require('./routes/courses'));
 app.use('/api/payments', require('./routes/payments'));
 app.use('/api/live-classes', require('./routes/liveClasses'));
 app.use('/api/workshops', require('./routes/workshops'));
+console.log('--- Registering Bootcamp Routes ---');
+app.use('/api/bootcamps', require('./routes/bootcamps'));
 app.use('/api/projects', require('./routes/projects'));
 app.use('/api/curriculum', require('./routes/curriculum'));
 app.use('/api/categories', require('./routes/categories'));
