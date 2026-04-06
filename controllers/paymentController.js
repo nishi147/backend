@@ -10,6 +10,8 @@ const sendEmail = require('../utils/sendEmail');
 const Coupon = require('../models/Coupon');
 const Sale = require('../models/Sale');
 const Lead = require('../models/Lead');
+const Bootcamp = require('../models/Bootcamp');
+const BootcampBooking = require('../models/BootcampBooking');
 
 const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID,
@@ -341,6 +343,108 @@ exports.verifyWorkshopPayment = async (req, res) => {
 
     } catch (error) {
         console.error("Workshop Verification Error:", error);
+        res.status(500).json({ success: false, message: 'Internal server error during verification' });
+    }
+};
+
+// @desc    Create Razorpay Order for Bootcamp
+// @route   POST /api/payments/bootcamp-order
+// @access  Private (Authenticated)
+exports.createBootcampOrder = async (req, res) => {
+    try {
+        const { bootcampId } = req.body;
+        
+        if (!bootcampId) {
+            return res.status(400).json({ success: false, message: 'Bootcamp ID is required' });
+        }
+
+        const bootcamp = await Bootcamp.findById(bootcampId);
+        if (!bootcamp) {
+            return res.status(404).json({ success: false, message: 'Bootcamp not found' });
+        }
+
+        const options = {
+            amount: Math.round(bootcamp.price * 100), // Ensure integer paise
+            currency: 'INR',
+            receipt: `bootcamp_order_${Date.now()}`,
+            notes: {
+                bootcampId,
+                userId: req.user?.id
+            }
+        };
+
+        const order = await razorpay.orders.create(options);
+        res.status(200).json({ success: true, data: order });
+    } catch (error) {
+        console.error("Bootcamp Order Error:", error);
+        res.status(500).json({ success: false, message: 'Failed to create bootcamp order' });
+    }
+};
+
+// @desc    Verify Bootcamp Payment
+// @route   POST /api/payments/bootcamp-verify
+// @access  Private (Authenticated)
+exports.verifyBootcampPayment = async (req, res) => {
+    try {
+        const { 
+            razorpay_order_id, 
+            razorpay_payment_id, 
+            razorpay_signature, 
+            bootcampId,
+            guestName,
+            guestEmail,
+            guestPhone,
+            guestAge
+        } = req.body;
+
+        if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+            return res.status(400).json({ success: false, message: "Missing payment identifiers" });
+        }
+
+        const sign = razorpay_order_id + "|" + razorpay_payment_id;
+        const expectedSign = crypto
+            .createHmac("sha256", process.env.RAZORPAY_SECRET)
+            .update(sign.toString())
+            .digest("hex");
+
+        if (razorpay_signature !== expectedSign) {
+            return res.status(400).json({ success: false, message: "Invalid payment signature" });
+        }
+
+        const bootcamp = await Bootcamp.findById(bootcampId);
+        if (!bootcamp) {
+            return res.status(404).json({ success: false, message: "Bootcamp details not found" });
+        }
+        
+        // Create bootcamp booking record
+        await BootcampBooking.create({
+            user: req.user ? req.user.id : undefined,
+            bootcamp: bootcampId,
+            guestName,
+            guestEmail,
+            guestPhone,
+            guestAge,
+            paymentId: razorpay_payment_id,
+            orderId: razorpay_order_id,
+            amount: bootcamp.price,
+            status: 'success'
+        });
+
+        // Send Confirmation Email
+        const targetEmail = req.user ? req.user.email : guestEmail;
+        const targetName = req.user ? req.user.name : guestName;
+
+        await sendEmail({
+            email: targetEmail,
+            subject: `Bootcamp Confirmed: ${bootcamp.title}! 🎓`,
+            message: `Hi ${targetName},\n\nYour seat is confirmed for the bootcamp: ${bootcamp.title}.\nDate: ${new Date(bootcamp.date).toLocaleDateString()} to ${new Date(bootcamp.endDate).toLocaleDateString()}\nVenue: ${bootcamp.venue}\n\nGet ready for an intensive learning journey!\nTeam RUZANN`,
+            html: `<h1>Bootcamp Enrollment Confirmed! 🎓</h1><p>Hi ${targetName},</p><p>You are officially enrolled in: <strong>${bootcamp.title}</strong>.</p><p><strong>Dates:</strong> ${new Date(bootcamp.date).toLocaleDateString()} to ${new Date(bootcamp.endDate).toLocaleDateString()}<br><strong>Venue:</strong> ${bootcamp.venue}</p><p>Get ready for an intensive learning journey!<br>Team RUZANN</p>`
+        });
+
+        return res.status(200).json({ success: true, message: "Bootcamp booking confirmed" });
+
+    } catch (error) {
+        console.error("Bootcamp Verification Error:", error);
         res.status(500).json({ success: false, message: 'Internal server error during verification' });
     }
 };
