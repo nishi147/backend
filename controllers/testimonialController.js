@@ -1,4 +1,5 @@
 const Testimonial = require('../models/Testimonial');
+const { uploadToCloudinary } = require('../utils/cloudinary');
 
 // @desc    Get all testimonials
 // @route   GET /api/testimonials
@@ -18,6 +19,13 @@ exports.getTestimonials = async (req, res) => {
 // @access  Private/Admin
 exports.createTestimonial = async (req, res) => {
   try {
+    if (req.file) {
+      try {
+        req.body.image = await uploadToCloudinary(req.file.buffer, 'ruzann/testimonials');
+      } catch (uploadErr) {
+        console.error("Testimonial Image Upload Error:", uploadErr);
+      }
+    }
     const testimonial = await Testimonial.create(req.body);
     res.status(201).json({ success: true, data: testimonial });
   } catch (error) {
@@ -30,6 +38,13 @@ exports.createTestimonial = async (req, res) => {
 // @access  Private/Admin
 exports.updateTestimonial = async (req, res) => {
   try {
+    if (req.file) {
+      try {
+        req.body.image = await uploadToCloudinary(req.file.buffer, 'ruzann/testimonials');
+      } catch (uploadErr) {
+        console.error("Testimonial Image Update Error:", uploadErr);
+      }
+    }
     const testimonial = await Testimonial.findByIdAndUpdate(req.params.id, req.body, {
       new: true,
       runValidators: true

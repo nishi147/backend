@@ -1,4 +1,5 @@
 const Project = require('../models/Project');
+const { uploadToCloudinary } = require('../utils/cloudinary');
 
 // @desc    Get all approved projects
 // @route   GET /api/projects
@@ -51,6 +52,14 @@ exports.createProject = async (req, res) => {
             if (!req.body.studentId) {
                 delete req.body.studentId;
             }
+        }
+
+        if (req.file) {
+          try {
+            req.body.thumbnail = await uploadToCloudinary(req.file.buffer, 'ruzann/projects');
+          } catch (uploadErr) {
+            console.error("Project Thumbnail Upload Error:", uploadErr);
+          }
         }
 
         const project = await Project.create(req.body);

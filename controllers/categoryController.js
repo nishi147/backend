@@ -1,5 +1,6 @@
 const Category = require('../models/Category');
 const Course = require('../models/Course');
+const { uploadToCloudinary } = require('../utils/cloudinary');
 
 // @desc    Get all categories
 // @route   GET /api/categories
@@ -43,6 +44,13 @@ exports.getCategory = async (req, res) => {
 // @access  Private (Admin)
 exports.createCategory = async (req, res) => {
     try {
+        if (req.file) {
+          try {
+            req.body.image = await uploadToCloudinary(req.file.buffer, 'ruzann/categories');
+          } catch (uploadErr) {
+            console.error("Category Image Upload Error:", uploadErr);
+          }
+        }
         const category = await Category.create(req.body);
         res.status(201).json({ success: true, data: category });
     } catch (error) {
@@ -58,6 +66,13 @@ exports.createCategory = async (req, res) => {
 // @access  Private (Admin)
 exports.updateCategory = async (req, res) => {
     try {
+        if (req.file) {
+          try {
+            req.body.image = await uploadToCloudinary(req.file.buffer, 'ruzann/categories');
+          } catch (uploadErr) {
+            console.error("Category Image Update Error:", uploadErr);
+          }
+        }
         const category = await Category.findByIdAndUpdate(req.params.id, req.body, {
             new: true,
             runValidators: true

@@ -8,6 +8,7 @@ const {
     deleteProject
 } = require('../controllers/projectController');
 const { protect, authorize } = require('../middleware/auth');
+const upload = require('../utils/upload');
 
 const router = express.Router();
 
@@ -15,7 +16,7 @@ const router = express.Router();
 router.get('/', getProjects);
 
 // Protected routes
-router.post('/', protect, createProject);
+router.post('/', protect, upload.single('thumbnail'), createProject);
 router.get('/my-projects', protect, authorize('student'), getMyProjects);
 router.delete('/:id', protect, deleteProject);
 

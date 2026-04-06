@@ -1,4 +1,5 @@
 const Blog = require('../models/Blog');
+const { uploadToCloudinary } = require('../utils/cloudinary');
 
 // Get all blogs
 exports.getBlogs = async (req, res) => {
@@ -29,6 +30,15 @@ exports.createBlog = async (req, res) => {
         if (existing) {
             return res.status(400).json({ success: false, message: 'A blog with this title already exists!' });
         }
+
+        if (req.file) {
+          try {
+            req.body.image = await uploadToCloudinary(req.file.buffer, 'ruzann/blogs');
+          } catch (uploadErr) {
+            console.error("Blog Image Upload Error:", uploadErr);
+          }
+        }
+
         const blog = await Blog.create(req.body);
         res.status(201).json({ success: true, data: blog });
     } catch (err) {
@@ -43,6 +53,14 @@ exports.updateBlog = async (req, res) => {
         // If title changed, update slug
         if (req.body.title) {
             req.body.slug = req.body.title.toLowerCase().replace(/ /g, '-').replace(/[^\w-]+/g, '');
+        }
+
+        if (req.file) {
+          try {
+            req.body.image = await uploadToCloudinary(req.file.buffer, 'ruzann/blogs');
+          } catch (uploadErr) {
+            console.error("Blog Image Update Error:", uploadErr);
+          }
         }
         
         const blog = await Blog.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });

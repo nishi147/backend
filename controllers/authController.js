@@ -2,6 +2,7 @@ const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const sendEmail = require('../utils/sendEmail');
+const { uploadToCloudinary } = require('../utils/cloudinary');
 
 const sendTokenResponse = (user, statusCode, res) => {
     const payload = { id: user._id };
@@ -46,8 +47,11 @@ exports.register = async (req, res) => {
 
         let profilePicture = '';
         if (req.file) {
-            const b64 = Buffer.from(req.file.buffer).toString('base64');
-            profilePicture = `data:${req.file.mimetype};base64,${b64}`;
+            try {
+                profilePicture = await uploadToCloudinary(req.file.buffer, 'ruzann/profiles');
+            } catch (err) {
+                console.error("Cloudinary upload failed during registration:", err);
+            }
         }
 
         user = await User.create({

@@ -6,6 +6,7 @@ const {
     updateCategory,
     deleteCategory
 } = require('../controllers/categoryController');
+const upload = require('../utils/upload');
 
 const router = express.Router();
 const { protect, authorize } = require('../middleware/auth');
@@ -17,8 +18,8 @@ router.get('/:id', getCategory);
 router.use(protect);
 router.use(authorize('admin'));
 
-router.post('/', createCategory);
-router.put('/:id', updateCategory);
+router.post('/', upload.single('image'), createCategory);
+router.put('/:id', upload.single('image'), updateCategory);
 router.delete('/:id', deleteCategory);
 
 module.exports = router;

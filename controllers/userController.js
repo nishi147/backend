@@ -2,6 +2,7 @@ const User = require('../models/User');
 const Course = require('../models/Course');
 const Enrollment = require('../models/Enrollment');
 const Payment = require('../models/Payment');
+const { uploadToCloudinary } = require('../utils/cloudinary');
 
 // @desc    Get all users
 // @route   GET /api/users
@@ -12,7 +13,7 @@ exports.getUsers = async (req, res) => {
         const users = await User.find(filter);
         res.status(200).json({ success: true, data: users });
     } catch (error) {
-         res.status(500).json({ success: false, message: 'Server error' });
+        res.status(500).json({ success: false, message: 'Server error' });
     }
 };
 
@@ -46,12 +47,21 @@ exports.approveTeacher = async (req, res) => {
 // @access  Private/Admin
 exports.createMentor = async (req, res) => {
     try {
-        const { name, email, password, specialization, profilePicture } = req.body;
+        const { name, email, password, specialization } = req.body;
         
         // Check if user already exists
         let user = await User.findOne({ email });
         if (user) {
             return res.status(400).json({ success: false, message: 'User already exists' });
+        }
+
+        let profilePicture = req.body.profilePicture || '';
+        if (req.file) {
+          try {
+            profilePicture = await uploadToCloudinary(req.file.buffer, 'ruzann/profiles');
+          } catch (err) {
+            console.error("Mentor profile picture upload failed:", err);
+          }
         }
 
         user = await User.create({
@@ -76,11 +86,20 @@ exports.createMentor = async (req, res) => {
 // @access  Private/Admin
 exports.updateMentor = async (req, res) => {
     try {
-        const { name, specialization, profilePicture, isApprovedTeacher } = req.body;
+        const { name, specialization, isApprovedTeacher } = req.body;
         
         let user = await User.findById(req.params.id);
         if (!user) {
             return res.status(404).json({ success: false, message: 'Mentor not found' });
+        }
+
+        let profilePicture = req.body.profilePicture || user.profilePicture;
+        if (req.file) {
+          try {
+            profilePicture = await uploadToCloudinary(req.file.buffer, 'ruzann/profiles');
+          } catch (err) {
+            console.error("Mentor profile picture update failed:", err);
+          }
         }
 
         user = await User.findByIdAndUpdate(req.params.id, {
