@@ -100,6 +100,15 @@ exports.createCourse = async (req, res) => {
     console.log("Calculated isPublished:", isPublished);
     console.log("Calculated isApproved:", isApproved);
 
+    // ✅ NEW: JSON parse modules if stringified (from FormData)
+    if (req.body?.modules && typeof req.body.modules === 'string') {
+      try {
+        req.body.modules = JSON.parse(req.body.modules);
+      } catch (err) {
+        console.error("Failed to parse modules JSON:", err);
+      }
+    }
+
     const courseData = {
       title,
       category,
