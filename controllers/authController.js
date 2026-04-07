@@ -108,8 +108,6 @@ exports.logout = (req, res) => {
     res.status(200).json({ success: true, data: {} });
 };
 
-const Enrollment = require('../models/Enrollment');
-
 // @desc    Get current logged in user
 // @route   GET /api/auth/me
 // @access  Private
@@ -132,15 +130,21 @@ exports.getMe = async (req, res) => {
 
         // Fetch enrollments if student
         let enrollments = [];
+        let bootcampBookings = [];
         if (user.role === 'student') {
+            const Enrollment = require('../models/Enrollment');
+            const BootcampBooking = require('../models/BootcampBooking');
+            
             enrollments = await Enrollment.find({ student: req.user.id, status: 'active' }).select('course status');
+            bootcampBookings = await BootcampBooking.find({ user: req.user.id, status: 'success' }).select('bootcamp status');
         }
 
         res.status(200).json({ 
             success: true, 
             data: {
                 ...user.toObject(),
-                enrollments
+                enrollments,
+                bootcamps: bootcampBookings
             } 
         });
     } catch (error) {

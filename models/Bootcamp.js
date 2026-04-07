@@ -1,5 +1,20 @@
 const mongoose = require('mongoose');
 
+const LessonSchema = new mongoose.Schema({
+  title: { type: String, required: true },
+  description: { type: String },
+  videoUrl: { type: String },
+  pdfUrl: { type: String },
+  duration: { type: String },
+  order: { type: Number, default: 0 },
+});
+
+const ModuleSchema = new mongoose.Schema({
+  title: { type: String, required: true },
+  order: { type: Number, default: 0 },
+  lessons: [LessonSchema]
+});
+
 const BootcampSchema = new mongoose.Schema({
   title: {
     type: String,
@@ -43,7 +58,8 @@ const BootcampSchema = new mongoose.Schema({
     type: mongoose.Schema.ObjectId,
     ref: 'User',
     required: true
-  }
+  },
+  modules: [ModuleSchema]
 }, {
   timestamps: true,
 });

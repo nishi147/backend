@@ -22,7 +22,7 @@ const seedAdmin = async () => {
             await adminExists.save();
         } else {
             await User.create({
-                name: 'Super Admin',
+                name: 'Ruzann',
                 email: 'admin@ruzann.com',
                 password: process.env.ADMIN_PASSWORD || '@SAruzann#786',
                 phone: process.env.ADMIN_PHONE || '9111111111',

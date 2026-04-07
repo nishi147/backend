@@ -44,6 +44,16 @@ exports.createBootcamp = async (req, res) => {
     console.log("User:", req.user?.id);
     
     req.body.instructor = req.user.id;
+    
+    // Parse modules if they are sent as JSON string
+    if (req.body.modules && typeof req.body.modules === 'string') {
+      try {
+        req.body.modules = JSON.parse(req.body.modules);
+      } catch (err) {
+        console.error("Error parsing bootcamp modules:", err);
+      }
+    }
+    
     if (req.file) {
       try {
         console.log("Uploading bootcamp image to Cloudinary...");
@@ -75,6 +85,14 @@ exports.updateBootcamp = async (req, res) => {
     // Make sure user is bootcamp instructor or admin
     if (bootcamp.instructor.toString() !== req.user.id && req.user.role !== 'admin') {
       return res.status(401).json({ success: false, message: 'Not authorized to update this bootcamp' });
+    }
+
+    if (req.body.modules && typeof req.body.modules === 'string') {
+      try {
+        req.body.modules = JSON.parse(req.body.modules);
+      } catch (err) {
+        console.error("Error parsing bootcamp modules update:", err);
+      }
     }
 
     if (req.file) {
