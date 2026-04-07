@@ -10,6 +10,7 @@ const UserSchema = new mongoose.Schema({
     isApprovedTeacher: { type: Boolean, default: false }, // Admins must approve teachers
     isApprovedStudent: { type: Boolean, default: false }, // Admins must approve students
     specialization: { type: String, default: '' }, // e.g., "Coding Expert", "Math Wizard"
+    systemCode: { type: String, unique: true, sparse: true }, // RU-ADM-A01
     profilePicture: { type: String, default: '' },
     referralCode: { type: String, unique: true, sparse: true },
     resetPasswordToken: String,

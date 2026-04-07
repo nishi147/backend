@@ -31,6 +31,7 @@ exports.getCourse = async (req, res) => {
         if (!course) {
             return res.status(404).json({ success: false, message: 'Course not found' });
         }
+        console.log(`[DEBUG] Fetched course ${course.title}, modules: ${course.modules?.length || 0}`);
         res.status(200).json({ success: true, data: course });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Server error' });
@@ -202,7 +203,7 @@ exports.updateCourse = async (req, res) => {
         if (req.body?.modules && typeof req.body.modules === 'string') {
             try { 
                 req.body.modules = JSON.parse(req.body.modules); 
-                console.log("Parsed modules string to JSON successfully.");
+                console.log(`[DEBUG] Parsed modules string. Count: ${req.body.modules.length}`);
             } 
             catch(err) { 
                 console.error("JSON Parse Error for modules field:", err.message);

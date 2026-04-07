@@ -145,8 +145,8 @@ exports.verifyPayment = async (req, res) => {
             await sendEmail({
                 email: req.user.email,
                 subject: `Welcome to ${course.title}! 🎒`,
-                message: `Hi ${req.user.name},\n\nPayment successful! You are now enrolled in ${course.title}. Log in to your dashboard to start learning.\n\nHappy Learning!\nTeam RUZANN`,
-                html: `<h1>Welcome to ${course.title}! 🎒</h1><p>Hi ${req.user.name},</p><p>Payment successful! You are now enrolled in <strong>${course.title}</strong>.</p><p>Log in to your dashboard to start learning.</p><p>Happy Learning!<br>Team RUZANN</p>`
+                message: `Hi ${req.user.name},\n\nPayment successful! You are now enrolled in ${course.title} (${sessions} Modules). Log in to your dashboard to start learning.\n\nHappy Learning!\nTeam RUZANN`,
+                html: `<h1>Welcome to ${course.title}! 🎒</h1><p>Hi ${req.user.name},</p><p>Payment successful! You are now enrolled in <strong>${course.title}</strong> (Total Modules: ${sessions}).</p><p>Log in to your dashboard to start learning.</p><p>Happy Learning!<br>Team RUZANN</p>`
             });
 
             return res.status(200).json({ success: true, message: "Payment verified successfully" });
