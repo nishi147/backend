@@ -159,13 +159,13 @@ exports.verifyPayment = async (req, res) => {
     }
 };
 
-// @desc    Create Razorpay Order for ₹1 Intro Offer
+// @desc    Create Razorpay Order for ₹99 Intro Offer
 // @route   POST /api/payments/intro-order
 // @access  Public
 exports.createIntroOrder = async (req, res) => {
     try {
         const options = {
-            amount: 100, // ₹1 = 100 paise
+            amount: 9900, // ₹99 = 9900 paise
             currency: 'INR',
             receipt: `intro_order_${Date.now()}`,
         };
@@ -178,7 +178,7 @@ exports.createIntroOrder = async (req, res) => {
     }
 };
 
-// @desc    Verify ₹1 Intro Payment
+// @desc    Verify ₹99 Intro Payment
 // @route   POST /api/payments/intro-verify
 // @access  Public
 exports.verifyIntroPayment = async (req, res) => {
@@ -219,11 +219,11 @@ exports.verifyIntroPayment = async (req, res) => {
             await sendEmail({
                 email: email,
                 subject: 'Your RUZANN Adventure Starts Now! 🌟',
-                message: `Hi ${parentName},\n\nPayment of ₹1 successful! We've received your booking for ${studentName}.\n\nMeeting Link: ${trialLink}\nOur team will contact you shortly with the next steps.\n\nWelcome to the family!\nTeam RUZANN`,
-                html: `<h1>Your RUZANN Adventure Starts Now! 🌟</h1><p>Hi ${parentName},</p><p>Payment of <strong>₹1</strong> successful!</p><p>We've received your booking for <strong>${studentName}</strong> (Age: ${age}).</p><p><strong>Meeting Link:</strong> <a href="${trialLink}">${trialLink}</a></p><p>Our team will contact you shortly at ${phone} with the next steps.</p><p>Welcome to the family!<br>Team RUZANN</p>`
+                message: `Hi ${parentName},\n\nPayment of ₹99 successful! We've received your booking for ${studentName}.\n\nMeeting Link: ${trialLink}\nOur team will contact you shortly with the next steps.\n\nWelcome to the family!\nTeam RUZANN`,
+                html: `<h1>Your RUZANN Adventure Starts Now! 🌟</h1><p>Hi ${parentName},</p><p>Payment of <strong>₹99</strong> successful!</p><p>We've received your booking for <strong>${studentName}</strong> (Age: ${age}).</p><p><strong>Meeting Link:</strong> <a href="${trialLink}">${trialLink}</a></p><p>Our team will contact you shortly at ${phone} with the next steps.</p><p>Welcome to the family!<br>Team RUZANN</p>`
             });
 
-            return res.status(200).json({ success: true, message: "₹1 Offer Claimed Successfully!" });
+            return res.status(200).json({ success: true, message: "₹99 Offer Claimed Successfully!" });
         } else {
             return res.status(400).json({ success: false, message: "Invalid signature sent!" });
         }
