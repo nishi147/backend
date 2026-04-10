@@ -37,8 +37,9 @@ const CourseSchema = new mongoose.Schema({
     // New Filter Fields
     ageGroup: { type: String, enum: ['All', '6-9', '10-12', '13-16'], default: 'All' },
     courseType: { type: String, enum: ['1:1', 'Group'], default: 'Group' },
-    rating: { type: Number, default: 5.0 },
+    rating: { type: Number, default: 0 },
     studentsEnrolled: { type: Number, default: 0 },
+    showStudentsEnrolled: { type: Boolean, default: false },
 
     // Session Pricing (Existing)
     numberOfSessions: { type: Number, required: true, default: 1 },

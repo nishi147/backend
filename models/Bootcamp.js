@@ -54,10 +54,22 @@ const BootcampSchema = new mongoose.Schema({
     type: String,
     trim: true,
   },
-  instructor: {
+    instructor: {
     type: mongoose.Schema.ObjectId,
     ref: 'User',
     required: true
+  },
+  rating: {
+    type: Number,
+    default: 0,
+  },
+  showStudentsEnrolled: {
+    type: Boolean,
+    default: false,
+  },
+  studentsEnrolled: {
+    type: Number,
+    default: 0,
   },
   modules: [ModuleSchema]
 }, {

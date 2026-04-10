@@ -35,6 +35,23 @@ const WorkshopSchema = new mongoose.Schema({
     type: String,
     trim: true,
   },
+  instructor: {
+    type: mongoose.Schema.ObjectId,
+    ref: 'User',
+    required: false
+  },
+  rating: {
+    type: Number,
+    default: 0,
+  },
+  showStudentsEnrolled: {
+    type: Boolean,
+    default: false,
+  },
+  studentsEnrolled: {
+    type: Number,
+    default: 0,
+  },
 }, {
   timestamps: true,
 });

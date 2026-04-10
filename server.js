@@ -135,7 +135,7 @@ app.use('/uploads', express.static('uploads'));
 
 
 // Routes
-app.get('/api/mentors', getApprovedTeachers);
+app.use('/api/mentors', require('./routes/mentors'));
 
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/users', require('./routes/users'));

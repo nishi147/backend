@@ -31,12 +31,21 @@ exports.createBlog = async (req, res) => {
             return res.status(400).json({ success: false, message: 'A blog with this title already exists!' });
         }
 
-        if (req.file) {
-          try {
-            req.body.image = await uploadToCloudinary(req.file.buffer, 'ruzann/blogs');
-          } catch (uploadErr) {
-            console.error("Blog Image Upload Error:", uploadErr);
-          }
+        if (req.files) {
+            if (req.files.image) {
+                try {
+                    req.body.image = await uploadToCloudinary(req.files.image[0].buffer, 'ruzann/blogs');
+                } catch (uploadErr) {
+                    console.error("Blog Image Upload Error:", uploadErr);
+                }
+            }
+            if (req.files.video) {
+                try {
+                    req.body.videoUrl = await uploadToCloudinary(req.files.video[0].buffer, 'ruzann/blogs');
+                } catch (uploadErr) {
+                    console.error("Blog Video Upload Error:", uploadErr);
+                }
+            }
         }
 
         const blog = await Blog.create(req.body);
@@ -55,12 +64,21 @@ exports.updateBlog = async (req, res) => {
             req.body.slug = req.body.title.toLowerCase().replace(/ /g, '-').replace(/[^\w-]+/g, '');
         }
 
-        if (req.file) {
-          try {
-            req.body.image = await uploadToCloudinary(req.file.buffer, 'ruzann/blogs');
-          } catch (uploadErr) {
-            console.error("Blog Image Update Error:", uploadErr);
-          }
+        if (req.files) {
+            if (req.files.image) {
+                try {
+                    req.body.image = await uploadToCloudinary(req.files.image[0].buffer, 'ruzann/blogs');
+                } catch (uploadErr) {
+                    console.error("Blog Image Update Error:", uploadErr);
+                }
+            }
+            if (req.files.video) {
+                try {
+                    req.body.videoUrl = await uploadToCloudinary(req.files.video[0].buffer, 'ruzann/blogs');
+                } catch (uploadErr) {
+                    console.error("Blog Video Update Error:", uploadErr);
+                }
+            }
         }
         
         const blog = await Blog.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });

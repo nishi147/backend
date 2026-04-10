@@ -23,7 +23,7 @@ exports.getUsers = async (req, res) => {
 exports.getApprovedTeachers = async (req, res) => {
     try {
         const teachers = await User.find({ role: 'teacher', isApprovedTeacher: true })
-            .select('name profilePicture specialization');
+            .select('name profilePicture specialization bio');
         res.status(200).json({ success: true, data: teachers });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Server error' });
@@ -47,7 +47,7 @@ exports.approveTeacher = async (req, res) => {
 // @access  Private/Admin
 exports.createMentor = async (req, res) => {
     try {
-        const { name, email, password, specialization } = req.body;
+        const { name, email, password, specialization, bio } = req.body;
         
         // Check if user already exists
         let user = await User.findOne({ email });
@@ -71,6 +71,7 @@ exports.createMentor = async (req, res) => {
             role: 'teacher',
             isApprovedTeacher: true,
             specialization,
+            bio,
             profilePicture
         });
 
@@ -86,7 +87,7 @@ exports.createMentor = async (req, res) => {
 // @access  Private/Admin
 exports.updateMentor = async (req, res) => {
     try {
-        const { name, specialization, isApprovedTeacher } = req.body;
+        const { name, specialization, bio, isApprovedTeacher } = req.body;
         
         let user = await User.findById(req.params.id);
         if (!user) {
@@ -105,6 +106,7 @@ exports.updateMentor = async (req, res) => {
         user = await User.findByIdAndUpdate(req.params.id, {
             name,
             specialization,
+            bio,
             profilePicture,
             isApprovedTeacher
         }, { new: true, runValidators: true });
@@ -206,6 +208,42 @@ exports.updateRole = async (req, res) => {
         if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
         res.status(200).json({ success: true, data: user });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+};
+
+// @desc    Get Detailed Teacher Profile (Public)
+// @route   GET /api/mentors/:id
+// @access  Public
+exports.getTeacherDetail = async (req, res) => {
+    try {
+        const teacher = await User.findById(req.params.id)
+            .select('name profilePicture specialization bio');
+
+        if (!teacher || teacher.role !== 'teacher') {
+            return res.status(404).json({ success: false, message: 'Teacher not found' });
+        }
+
+        // Fetch associated learning assets
+        const [courses, workshops, bootcamps] = await Promise.all([
+            Course.find({ teacher: teacher._id, isPublished: true, isApproved: true })
+                .select('title thumbnail pricePerSession numberOfSessions totalCoursePrice category rating studentsEnrolled showStudentsEnrolled')
+                .populate('category', 'name icon'),
+            require('../models/Workshop').find({ instructor: teacher._id, status: 'upcoming' }),
+            require('../models/Bootcamp').find({ instructor: teacher._id, status: 'upcoming' })
+        ]);
+
+        res.status(200).json({
+            success: true,
+            data: {
+                profile: teacher,
+                courses,
+                workshops,
+                bootcamps
+            }
+        });
     } catch (error) {
         console.error(error);
         res.status(500).json({ success: false, message: 'Server error' });
