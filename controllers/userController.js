@@ -219,10 +219,10 @@ exports.updateRole = async (req, res) => {
 // @access  Public
 exports.getTeacherDetail = async (req, res) => {
     try {
-        const teacher = await User.findById(req.params.id)
+        const teacher = await User.findOne({ _id: req.params.id, role: 'teacher' })
             .select('name profilePicture specialization bio');
 
-        if (!teacher || teacher.role !== 'teacher') {
+        if (!teacher) {
             return res.status(404).json({ success: false, message: 'Teacher not found' });
         }
 
