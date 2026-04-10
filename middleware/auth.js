@@ -5,13 +5,14 @@ const User = require('../models/User');
 exports.protect = async (req, res, next) => {
     let token;
 
-    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+    if (req.headers.authorization && req.headers.authorization.toLowerCase().startsWith('bearer')) {
         token = req.headers.authorization.split(' ')[1];
     } else if (req.cookies && req.cookies.token) {
         token = req.cookies.token;
     }
 
     if (!token) {
+        console.warn(`[AUTH] Missing token for request: ${req.method} ${req.originalUrl} from ${req.ip}`);
         return res.status(401).json({ success: false, message: 'Not authorized to access this route' });
     }
 
