@@ -1,5 +1,5 @@
 const express = require('express');
-const { getUsers, approveTeacher, approveStudent, getAnalytics, deleteUser, createMentor, updateMentor, updateRole } = require('../controllers/userController');
+const { getUsers, approveTeacher, approveStudent, getAnalytics, deleteUser, createMentor, updateMentor, updateRole, updateMyProfile } = require('../controllers/userController');
 const { protect, authorize } = require('../middleware/auth');
 const upload = require('../utils/upload');
 
@@ -12,6 +12,9 @@ router.get('/analytics', authorize('admin'), getAnalytics);
 router.put('/approve-teacher/:id', authorize('admin'), approveTeacher);
 router.put('/approve-student/:id', authorize('admin'), approveStudent);
 router.put('/:id/role', authorize('admin'), updateRole);
+
+// Self profile update
+router.put('/me', upload.single('profilePicture'), updateMyProfile);
 
 // Mentor Management
 router.post('/mentors', authorize('admin'), upload.single('profilePicture'), createMentor);

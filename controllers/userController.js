@@ -249,3 +249,31 @@ exports.getTeacherDetail = async (req, res) => {
         res.status(500).json({ success: false, message: 'Server error' });
     }
 };
+
+// @desc    Update own profile (name, phone, bio, profilePicture)
+// @route   PUT /api/users/me
+// @access  Private (student/teacher)
+exports.updateMyProfile = async (req, res) => {
+    try {
+        const { name, phone, bio, specialization } = req.body;
+        const updateFields = {};
+        if (name) updateFields.name = name;
+        if (phone) updateFields.phone = phone;
+        if (bio !== undefined) updateFields.bio = bio;
+        if (specialization !== undefined) updateFields.specialization = specialization;
+
+        if (req.file) {
+            try {
+                updateFields.profilePicture = await uploadToCloudinary(req.file.buffer, 'ruzann/profiles');
+            } catch (err) {
+                console.error('Profile picture upload failed:', err);
+            }
+        }
+
+        const user = await User.findByIdAndUpdate(req.user.id, updateFields, { new: true, runValidators: true });
+        res.status(200).json({ success: true, data: user });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+};
