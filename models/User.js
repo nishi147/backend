@@ -16,6 +16,8 @@ const UserSchema = new mongoose.Schema({
     referralCode: { type: String, unique: true, sparse: true },
     resetPasswordToken: String,
     resetPasswordExpire: Date,
+    otpPasswordToken: String,
+    otpPasswordExpire: Date,
     progress: [{
         courseId: { type: mongoose.Schema.Types.ObjectId, ref: 'Course' },
         completedLessons: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Lesson' }]

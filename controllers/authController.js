@@ -244,3 +244,95 @@ exports.resetPassword = async (req, res, next) => {
     res.status(500).json({ success: false, message: 'Server error in resetPassword', error: error.message });
   }
 };
+
+// @desc    Send OTP to email for password reset
+// @route   POST /api/auth/send-otp
+// @access  Public
+exports.sendOtp = async (req, res) => {
+  try {
+    const user = await User.findOne({ email: req.body.email?.toLowerCase().trim() });
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'No account found with that email address.' });
+    }
+
+    // Generate a 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const hashedOtp = crypto.createHash('sha256').update(otp).digest('hex');
+
+    user.otpPasswordToken = hashedOtp;
+    user.otpPasswordExpire = Date.now() + 10 * 60 * 1000; // 10 mins
+    await user.save({ validateBeforeSave: false });
+
+    const html = `
+      <div style="font-family:'Segoe UI',sans-serif;max-width:480px;margin:auto;background:#f9f9f9;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);">
+        <div style="background:linear-gradient(135deg,#EF4444,#7C3AED);padding:32px 24px;text-align:center;">
+          <h1 style="color:white;margin:0;font-size:28px;font-weight:900;">RUZANN 🚀</h1>
+          <p style="color:rgba(255,255,255,0.85);margin:6px 0 0;font-size:14px;">Password Reset OTP</p>
+        </div>
+        <div style="padding:32px 24px;background:white;">
+          <p style="color:#374151;font-size:16px;margin:0 0 8px;">Hi <strong>${user.name}</strong>,</p>
+          <p style="color:#6B7280;font-size:14px;margin:0 0 24px;">Use the OTP below to reset your password. It expires in <strong>10 minutes</strong>.</p>
+          <div style="background:#F3F4F6;border:2px dashed #E5E7EB;border-radius:12px;padding:20px;text-align:center;margin-bottom:24px;">
+            <span style="font-size:40px;font-weight:900;letter-spacing:10px;color:#111827;">${otp}</span>
+          </div>
+          <p style="color:#9CA3AF;font-size:12px;margin:0;">If you didn't request this, please ignore this email.</p>
+        </div>
+      </div>
+    `;
+
+    const emailResult = await sendEmail({
+      email: user.email,
+      subject: 'Your RUZANN Password Reset OTP',
+      message: `Your OTP is: ${otp}. It expires in 10 minutes.`,
+      html
+    });
+
+    if (!emailResult) {
+      user.otpPasswordToken = undefined;
+      user.otpPasswordExpire = undefined;
+      await user.save({ validateBeforeSave: false });
+      return res.status(500).json({ success: false, message: 'Email could not be sent. Please try again.' });
+    }
+
+    res.status(200).json({ success: true, data: 'OTP sent to email' });
+  } catch (error) {
+    console.error('Send OTP Error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+// @desc    Verify OTP and reset password
+// @route   POST /api/auth/verify-otp-reset
+// @access  Public
+exports.verifyOtpResetPassword = async (req, res) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+
+    if (!email || !otp || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Email, OTP and new password are required.' });
+    }
+
+    const hashedOtp = crypto.createHash('sha256').update(otp.trim()).digest('hex');
+
+    const user = await User.findOne({
+      email: email.toLowerCase().trim(),
+      otpPasswordToken: hashedOtp,
+      otpPasswordExpire: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      return res.status(400).json({ success: false, message: 'Invalid or expired OTP. Please request a new one.' });
+    }
+
+    user.password = newPassword;
+    user.otpPasswordToken = undefined;
+    user.otpPasswordExpire = undefined;
+    await user.save();
+
+    res.status(200).json({ success: true, data: 'Password reset successfully.' });
+  } catch (error) {
+    console.error('Verify OTP Reset Error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
