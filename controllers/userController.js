@@ -277,3 +277,46 @@ exports.updateMyProfile = async (req, res) => {
         res.status(500).json({ success: false, message: 'Server error' });
     }
 };
+
+// @desc    Get teacher-specific stats (students, earnings)
+// @route   GET /api/users/teacher-stats
+// @access  Private (teacher)
+exports.getTeacherStats = async (req, res) => {
+    try {
+        // 1. Get all courses owned by this teacher
+        const courses = await Course.find({ teacher: req.user.id });
+        const courseIds = courses.map(c => c._id);
+
+        // 2. Get enrollment count for these courses
+        const studentCount = await Enrollment.countDocuments({ course: { $in: courseIds } });
+
+        // 3. Get total earnings from successful payments for these courses
+        const earningsData = await Payment.aggregate([
+            { 
+                $match: { 
+                    course_id: { $in: courseIds },
+                    status: 'success'
+                } 
+            },
+            { 
+                $group: { 
+                    _id: null, 
+                    totalEarnings: { $sum: '$amount' } 
+                } 
+            }
+        ]);
+
+        const totalEarnings = earningsData.length > 0 ? earningsData[0].totalEarnings : 0;
+
+        res.status(200).json({
+            success: true,
+            data: {
+                studentCount,
+                earnings: totalEarnings
+            }
+        });
+    } catch (error) {
+        console.error('Teacher Stats Error:', error);
+        res.status(500).json({ success: false, message: 'Server error fetching stats' });
+    }
+};
