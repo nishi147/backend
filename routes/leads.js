@@ -15,10 +15,11 @@ const {
 const router = express.Router();
 
 const { protect, authorize } = require('../middleware/auth');
+const upload = require('../utils/upload');
 
 // IMPORTANT: specific routes must come before /:id wildcards
 router.get('/performance', protect, authorize('admin'), getSalesPerformance);
-router.post('/share', protect, authorize('admin'), shareLeads);
+router.post('/share', protect, authorize('admin'), upload.single('leadFile'), shareLeads);
 router.get('/export', protect, authorize('admin', 'sales'), exportLeads);
 
 router.route('/')

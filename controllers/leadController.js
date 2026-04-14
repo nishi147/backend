@@ -418,27 +418,73 @@ exports.shareLeads = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Sales Person not found' });
         }
 
-        let query = {};
-        if (leadIds && leadIds.length > 0) {
-            query = { _id: { $in: leadIds } };
-        } else {
-            // Default to leads assigned to this person if no IDs provided
-            query = { assignedTo: targetUserId };
+        let combinedLeads = [];
+
+        // 1. Handle File Upload (External Leads)
+        if (req.file) {
+            const csvData = req.file.buffer.toString('utf-8');
+            const lines = csvData.split(/\r?\n/);
+            const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+            
+            const newLeadsData = [];
+            for (let i = 1; i < lines.length; i++) {
+                if (!lines[i].trim()) continue;
+                
+                // Simple CSV parser handling quotes
+                const row = lines[i].match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || [];
+                const leadObj = {};
+                
+                headers.forEach((header, index) => {
+                    const value = row[index]?.replace(/^"|"$/g, '').trim();
+                    if (header.includes('name')) leadObj.name = value;
+                    if (header.includes('email')) leadObj.email = value;
+                    if (header.includes('phone')) leadObj.phone = value;
+                    if (header.includes('source')) leadObj.source = value;
+                });
+
+                if (leadObj.name && leadObj.phone) {
+                    leadObj.assignedTo = targetUserId;
+                    leadObj.status = 'New';
+                    leadObj.priority = 'Medium';
+                    leadObj.activityLog = [{
+                        action: 'Lead Imported',
+                        note: 'Imported via Admin Share Upload',
+                        user: req.user._id
+                    }];
+                    newLeadsData.push(leadObj);
+                }
+            }
+
+            if (newLeadsData.length > 0) {
+                // Check for duplicates by phone (Optional sanity)
+                const createdLeads = await Lead.insertMany(newLeadsData);
+                combinedLeads = [...createdLeads];
+            }
         }
 
-        const leads = await Lead.find(query).populate('assignedTo', 'name email');
-        
-        if (leads.length === 0) {
+        // 2. Handle Existing Selected Leads
+        if (leadIds) {
+            const ids = Array.isArray(leadIds) ? leadIds : leadIds.split(',');
+            const existingLeads = await Lead.find({ _id: { $in: ids } }).populate('assignedTo', 'name email');
+            combinedLeads = [...combinedLeads, ...existingLeads];
+        } else if (!req.file) {
+            // Default to leads assigned to this person if no IDs and no file
+            const leads = await Lead.find({ assignedTo: targetUserId }).populate('assignedTo', 'name email');
+            combinedLeads = [...leads];
+        }
+
+        if (combinedLeads.length === 0) {
             return res.status(400).json({ success: false, message: 'No leads found to share' });
         }
 
-        let csv = 'Name,Email,Phone,Source,Status,Priority,Revenue,CreatedAt\n';
-        leads.forEach(lead => {
-            csv += `"${lead.name}","${lead.email || ''}","${lead.phone}","${lead.source}","${lead.status}","${lead.priority || 'Medium'}",${lead.revenue},${lead.createdAt.toISOString()}\n`;
+        // 3. Generate CSV for Email
+        let csvExport = 'Name,Email,Phone,Source,Status,Priority,Revenue,CreatedAt\n';
+        combinedLeads.forEach(lead => {
+            csvExport += `"${lead.name}","${lead.email || ''}","${lead.phone}","${lead.source}","${lead.status}","${lead.priority || 'Medium'}",${lead.revenue || 0},${lead.createdAt?.toISOString() || new Date().toISOString()}\n`;
         });
 
-        const subject = `Leads Report: ${leads.length} leads shared with you`;
-        const message = customMessage || `Hi ${salesUser.name},\n\nAttached is the leads report as requested by Admin.\n\nTotal Leads: ${leads.length}\n\nRegards,\nRuzann CRM`;
+        const subject = `Leads Shared: ${combinedLeads.length} leads assigned to you`;
+        const message = customMessage || `Hi ${salesUser.name},\n\nAdmin has shared/uploaded ${combinedLeads.length} leads for you.\n\nPlease check your dashboard for the details.\n\nRegards,\nRuzann CRM`;
 
         await sendEmail({
             email: salesUser.email,
@@ -446,17 +492,18 @@ exports.shareLeads = async (req, res) => {
             message: message,
             attachments: [
                 {
-                    filename: `leads_report_${new Date().toLocaleDateString().replace(/\//g, '-')}.csv`,
-                    content: csv
+                    filename: `leads_package_${new Date().toISOString().split('T')[0]}.csv`,
+                    content: csvExport
                 }
             ]
         });
 
         res.status(200).json({
             success: true,
-            message: `Leads CSV successfully shared with ${salesUser.name} (${salesUser.email})`
+            message: `${combinedLeads.length} leads successfully processed and shared with ${salesUser.name}.`
         });
     } catch (err) {
+        console.error("Share Leads Error:", err);
         res.status(400).json({ success: false, error: err.message });
     }
 };
