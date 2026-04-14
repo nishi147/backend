@@ -105,19 +105,7 @@ async function connectDB() {
   return cached.conn;
 }
 
-// Middleware to ensure DB is connected before every request
-app.use(async (req, res, next) => {
-    try {
-        await connectDB();
-        next();
-    } catch (error) {
-        res.status(500).json({ 
-            success: false, 
-            message: 'Database connection failed',
-            error: error.message 
-        });
-    }
-});
+// App routes below will use the initial connection established at boot.
 
 // Initial boot connection
 connectDB().catch(err => console.error("Initial Boot DB Error:", err));
