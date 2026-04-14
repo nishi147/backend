@@ -1,5 +1,6 @@
 const Lead = require('../models/Lead');
 const User = require('../models/User');
+const sendEmail = require('../utils/sendEmail');
 
 // @desc    Get all leads
 // @route   GET /api/leads
@@ -140,7 +141,14 @@ exports.createLead = async (req, res) => {
                 req.body.assignedTo = randomSales._id;
             }
 
-            lead = await Lead.create(req.body);
+            lead = await Lead.create({
+                ...req.body,
+                activityLog: [{
+                    action: 'Lead Created',
+                    note: `Lead created via ${req.body.source || 'Website'}`,
+                    timestamp: new Date()
+                }]
+            });
         }
 
         // Handle Referral Logic properly based on the schema
@@ -196,12 +204,138 @@ exports.updateLead = async (req, res) => {
             console.log(`[Lead Update] ${lead._id} status changed: ${lead.status} -> ${req.body.status}`);
         }
 
+        // Detect changes for activity logging
+        const activityEntries = [];
+        
+        if (req.body.status && req.body.status !== lead.status) {
+            activityEntries.push({
+                action: 'Status Changed',
+                note: `Status updated from ${lead.status} to ${req.body.status}`,
+                user: req.user._id
+            });
+
+            // If status changed to Converted, set convertedAt and default revenue
+            if (req.body.status === 'Converted') {
+                req.body.convertedAt = Date.now();
+                req.body.revenue = req.body.revenue || 0;
+                
+                // Mark associated referral as successful
+                const Referral = require('../models/Referral');
+                await Referral.findOneAndUpdate(
+                    { referredLead: lead._id },
+                    { status: 'Successful', reward: '₹500 Intro Bonus' }
+                );
+                console.log(`[Lead Update] Lead ${lead._id} changed to Converted. Revenue: ₹${req.body.revenue}`);
+            }
+        }
+
+        if (req.body.priority && req.body.priority !== lead.priority) {
+            activityEntries.push({
+                action: 'Priority Changed',
+                note: `Priority updated from ${lead.priority} to ${req.body.priority}`,
+                user: req.user._id
+            });
+        }
+
+        if (req.body.assignedTo && req.body.assignedTo.toString() !== lead.assignedTo?.toString()) {
+            const assignee = await User.findById(req.body.assignedTo);
+            activityEntries.push({
+                action: 'Lead Assigned',
+                note: `Lead assigned to ${assignee ? assignee.name : 'Unknown User'}`,
+                user: req.user._id
+            });
+
+            // Notify assignee
+            if (assignee && assignee.email) {
+                await sendEmail({
+                    email: assignee.email,
+                    subject: 'New Lead Assigned: ' + lead.name,
+                    message: `Hi ${assignee.name},\n\nA new lead has been assigned to you.\n\nLead Name: ${lead.name}\nPhone: ${lead.phone}\n\nPlease check your dashboard for details.`
+                });
+            }
+        }
+
+        if (activityEntries.length > 0) {
+            req.body.$push = { activityLog: { $each: activityEntries } };
+        }
+
         lead = await Lead.findByIdAndUpdate(req.params.id, req.body, {
             new: true,
             runValidators: true
         });
 
         res.status(200).json({ success: true, data: lead });
+    } catch (err) {
+        res.status(400).json({ success: false, error: err.message });
+    }
+};
+
+// @desc    Assign lead specifically
+// @route   PUT /api/leads/:id/assign
+// @access  Private (Admin)
+exports.assignLead = async (req, res) => {
+    try {
+        const { assignedTo } = req.body;
+        if (!assignedTo) return res.status(400).json({ success: false, message: 'Assignee ID is required' });
+
+        const lead = await Lead.findById(req.params.id);
+        if (!lead) return res.status(404).json({ success: false, message: 'Lead not found' });
+
+        const assignee = await User.findById(assignedTo);
+        if (!assignee) return res.status(404).json({ success: false, message: 'Assignee not found' });
+
+        lead.assignedTo = assignedTo;
+        lead.activityLog.push({
+            action: 'Lead Assigned',
+            note: `Lead specifically assigned to ${assignee.name} by ${req.user.name}`,
+            user: req.user._id
+        });
+
+        await lead.save();
+
+        // Notify
+        if (assignee.email) {
+            await sendEmail({
+                email: assignee.email,
+                subject: 'New Lead Allocated: ' + lead.name,
+                message: `Hi ${assignee.name},\n\nYou have been allocated a new lead: ${lead.name}.\n\nLead Phone: ${lead.phone}\n\nLogin to Ruzann Sales Dashboard to contact them.`
+            });
+        }
+
+        res.status(200).json({ success: true, data: lead });
+    } catch (err) {
+        res.status(400).json({ success: false, error: err.message });
+    }
+};
+
+// @desc    Get Sales Performance for Admin
+// @route   GET /api/leads/performance
+// @access  Private (Admin)
+exports.getSalesPerformance = async (req, res) => {
+    try {
+        const salesUsers = await User.find({ role: 'sales' }).select('name email');
+        
+        const performance = await Promise.all(salesUsers.map(async (user) => {
+            const totalLeads = await Lead.countDocuments({ assignedTo: user._id });
+            const convertedLeads = await Lead.countDocuments({ assignedTo: user._id, status: 'Converted' });
+            
+            const revenueRes = await Lead.aggregate([
+                { $match: { assignedTo: user._id, status: 'Converted' } },
+                { $group: { _id: null, total: { $sum: '$revenue' } } }
+            ]);
+            
+            return {
+                userId: user._id,
+                name: user.name,
+                email: user.email,
+                totalLeads,
+                convertedLeads,
+                conversionRate: totalLeads > 0 ? (convertedLeads / totalLeads) * 100 : 0,
+                totalRevenue: revenueRes.length > 0 ? revenueRes[0].total : 0
+            };
+        }));
+
+        res.status(200).json({ success: true, data: performance });
     } catch (err) {
         res.status(400).json({ success: false, error: err.message });
     }
@@ -218,6 +352,13 @@ exports.addNote = async (req, res) => {
         lead.notes.push({
             text: req.body.text,
             author: req.user._id
+        });
+
+        // Also add to activity log
+        lead.activityLog.push({
+            action: 'Note Added',
+            note: req.body.text.substring(0, 50) + (req.body.text.length > 50 ? '...' : ''),
+            user: req.user._id
         });
 
         await lead.save();
@@ -256,6 +397,65 @@ exports.deleteLead = async (req, res) => {
         const lead = await Lead.findByIdAndDelete(req.params.id);
         if (!lead) return res.status(404).json({ success: false, message: 'Lead not found' });
         res.status(200).json({ success: true, data: {} });
+    } catch (err) {
+        res.status(400).json({ success: false, error: err.message });
+    }
+};
+
+// @desc    Share leads CSV via email to a sales person
+// @route   POST /api/leads/share
+// @access  Private (Admin)
+exports.shareLeads = async (req, res) => {
+    try {
+        const { targetUserId, leadIds, customMessage } = req.body;
+        
+        if (!targetUserId) {
+            return res.status(400).json({ success: false, message: 'Target Sales Person is required' });
+        }
+
+        const salesUser = await User.findById(targetUserId);
+        if (!salesUser) {
+            return res.status(404).json({ success: false, message: 'Sales Person not found' });
+        }
+
+        let query = {};
+        if (leadIds && leadIds.length > 0) {
+            query = { _id: { $in: leadIds } };
+        } else {
+            // Default to leads assigned to this person if no IDs provided
+            query = { assignedTo: targetUserId };
+        }
+
+        const leads = await Lead.find(query).populate('assignedTo', 'name email');
+        
+        if (leads.length === 0) {
+            return res.status(400).json({ success: false, message: 'No leads found to share' });
+        }
+
+        let csv = 'Name,Email,Phone,Source,Status,Priority,Revenue,CreatedAt\n';
+        leads.forEach(lead => {
+            csv += `"${lead.name}","${lead.email || ''}","${lead.phone}","${lead.source}","${lead.status}","${lead.priority || 'Medium'}",${lead.revenue},${lead.createdAt.toISOString()}\n`;
+        });
+
+        const subject = `Leads Report: ${leads.length} leads shared with you`;
+        const message = customMessage || `Hi ${salesUser.name},\n\nAttached is the leads report as requested by Admin.\n\nTotal Leads: ${leads.length}\n\nRegards,\nRuzann CRM`;
+
+        await sendEmail({
+            email: salesUser.email,
+            subject: subject,
+            message: message,
+            attachments: [
+                {
+                    filename: `leads_report_${new Date().toLocaleDateString().replace(/\//g, '-')}.csv`,
+                    content: csv
+                }
+            ]
+        });
+
+        res.status(200).json({
+            success: true,
+            message: `Leads CSV successfully shared with ${salesUser.name} (${salesUser.email})`
+        });
     } catch (err) {
         res.status(400).json({ success: false, error: err.message });
     }

@@ -6,7 +6,10 @@ const {
     updateLead,
     deleteLead,
     addNote,
-    exportLeads
+    exportLeads,
+    assignLead,
+    getSalesPerformance,
+    shareLeads
 } = require('../controllers/leadController');
 
 const router = express.Router();
@@ -14,6 +17,8 @@ const router = express.Router();
 const { protect, authorize } = require('../middleware/auth');
 
 // IMPORTANT: specific routes must come before /:id wildcards
+router.get('/performance', protect, authorize('admin'), getSalesPerformance);
+router.post('/share', protect, authorize('admin'), shareLeads);
 router.get('/export', protect, authorize('admin', 'sales'), exportLeads);
 
 router.route('/')
@@ -24,6 +29,9 @@ router.route('/:id')
     .get(protect, authorize('admin', 'sales'), getLead)
     .put(protect, authorize('admin', 'sales'), updateLead)
     .delete(protect, authorize('admin'), deleteLead);
+
+router.route('/:id/assign')
+    .put(protect, authorize('admin'), assignLead);
 
 router.route('/:id/notes')
     .post(protect, authorize('admin', 'sales'), addNote);

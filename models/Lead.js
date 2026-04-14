@@ -11,8 +11,13 @@ const LeadSchema = new mongoose.Schema({
     },
     status: { 
         type: String, 
-        enum: ['New', 'Contacted', 'Converted', 'Lost'], 
+        enum: ['New', 'Contacted', 'Interested', 'Converted', 'Lost'], 
         default: 'New' 
+    },
+    priority: {
+        type: String,
+        enum: ['High', 'Medium', 'Low'],
+        default: 'Medium'
     },
     assignedTo: { 
         type: mongoose.Schema.Types.ObjectId, 
@@ -22,6 +27,12 @@ const LeadSchema = new mongoose.Schema({
         text: String,
         date: { type: Date, default: Date.now },
         author: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+    }],
+    activityLog: [{
+        action: String,
+        note: String,
+        user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        timestamp: { type: Date, default: Date.now }
     }],
     followUpDate: { type: Date },
     convertedAt: { type: Date },
