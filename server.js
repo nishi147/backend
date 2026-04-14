@@ -110,10 +110,29 @@ async function connectDB() {
 // Initial boot connection
 connectDB().catch(err => console.error("Initial Boot DB Error:", err));
 
-// Middleware
+// Health Check for Vercel
+app.get('/api/health', (req, res) => res.status(200).json({ status: 'healthy', time: new Date().toISOString() }));
+
+// ROBUST CORS CONFIGURATION
+const allowedOrigins = [
+  'https://www.ruzann.com',
+  'https://ruzann.com',
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'https://frontend-ruzann.vercel.app',
+  'https://backend-olive-five-70.vercel.app'
+];
+
 app.use(cors({
-  origin: true,
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) === -1) {
+      return callback(new Error('CORS blocked: Origin not allowed'), false);
+    }
+    return callback(null, true);
+  },
   credentials: true,
+  optionsSuccessStatus: 200 // Some legacy browsers (IE11, various SmartTVs) choke on 204
 }));
 
 app.use(express.json({ limit: '5mb' }));
