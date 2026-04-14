@@ -47,7 +47,7 @@ exports.approveTeacher = async (req, res) => {
 // @access  Private/Admin
 exports.createMentor = async (req, res) => {
     try {
-        const { name, email, password, specialization, bio } = req.body;
+        const { name, email, password, specialization, bio, phone } = req.body;
         
         // Check if user already exists
         let user = await User.findOne({ email });
@@ -72,13 +72,14 @@ exports.createMentor = async (req, res) => {
             isApprovedTeacher: true,
             specialization,
             bio,
+            phone,
             profilePicture
         });
 
         res.status(201).json({ success: true, data: user });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ success: false, message: 'Server error' });
+        console.error("Mentor Creation Error:", error);
+        res.status(500).json({ success: false, message: error.message || 'Server error' });
     }
 };
 
@@ -87,7 +88,7 @@ exports.createMentor = async (req, res) => {
 // @access  Private/Admin
 exports.updateMentor = async (req, res) => {
     try {
-        const { name, specialization, bio, isApprovedTeacher } = req.body;
+        const { name, specialization, bio, isApprovedTeacher, phone } = req.body;
         
         let user = await User.findById(req.params.id);
         if (!user) {
@@ -107,14 +108,15 @@ exports.updateMentor = async (req, res) => {
             name,
             specialization,
             bio,
+            phone,
             profilePicture,
             isApprovedTeacher
         }, { new: true, runValidators: true });
 
         res.status(200).json({ success: true, data: user });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ success: false, message: 'Server error' });
+        console.error("Mentor Update Error:", error);
+        res.status(500).json({ success: false, message: error.message || 'Server error' });
     }
 };
 
