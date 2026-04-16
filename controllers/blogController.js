@@ -1,5 +1,18 @@
 const Blog = require('../models/Blog');
 const { uploadToCloudinary } = require('../utils/cloudinary');
+const sharp = require('sharp');
+
+// Helper to calculate reading time
+const calculateReadTime = (text) => {
+    const wordsPerMinute = 200;
+    const words = text.trim().split(/\s+/).length;
+    const minutes = Math.ceil(words / wordsPerMinute);
+    return {
+        minutes,
+        text: `${minutes} min read`,
+        wordCount: words
+    };
+};
 
 // Get all blogs
 exports.getBlogs = async (req, res) => {
@@ -11,10 +24,16 @@ exports.getBlogs = async (req, res) => {
     }
 };
 
-// Get single blog
+// Get single blog (supports ID or slug)
 exports.getBlog = async (req, res) => {
     try {
-        const blog = await Blog.findById(req.params.id);
+        const blog = await Blog.findOne({
+            $or: [
+                { _id: req.params.id.length === 24 ? req.params.id : null },
+                { slug: req.params.id }
+            ].filter(Boolean)
+        });
+        
         if (!blog) return res.status(404).json({ success: false, message: 'Blog not found' });
         res.status(200).json({ success: true, data: blog });
     } catch (err) {
@@ -25,30 +44,50 @@ exports.getBlog = async (req, res) => {
 // Create blog
 exports.createBlog = async (req, res) => {
     try {
-        // Simple manual slug check if duplicate title
-        const existing = await Blog.findOne({ title: req.body.title });
-        if (existing) {
-            return res.status(400).json({ success: false, message: 'A blog with this title already exists!' });
+        const body = { ...req.body };
+        
+        // Handle FAQs if sent as string
+        if (typeof body.faqs === 'string') {
+            body.faqs = JSON.parse(body.faqs);
         }
+        
+        // Handle Keywords
+        if (typeof body.keywords === 'string') {
+            body.keywords = body.keywords.split(',').map(k => k.trim());
+        }
+
+        // Calculate Read Time & Word Count
+        const stats = calculateReadTime(body.content || '');
+        body.readingTime = stats.minutes;
+        body.readTimeText = stats.text;
+        body.wordCount = stats.wordCount;
 
         if (req.files) {
             if (req.files.image) {
                 try {
-                    req.body.image = await uploadToCloudinary(req.files.image[0].buffer, 'ruzann/blogs');
+                    // Compress image using sharp
+                    const compressedBuffer = await sharp(req.files.image[0].buffer)
+                        .resize(1200, 630, { fit: 'cover' }) // Optimized for Open Graph
+                        .webp({ quality: 80 })
+                        .toBuffer();
+                    
+                    body.image = await uploadToCloudinary(compressedBuffer, 'ruzann/blogs');
                 } catch (uploadErr) {
                     console.error("Blog Image Upload Error:", uploadErr);
+                    // Fallback to original buffer if sharp fails
+                    body.image = await uploadToCloudinary(req.files.image[0].buffer, 'ruzann/blogs');
                 }
             }
             if (req.files.video) {
                 try {
-                    req.body.videoUrl = await uploadToCloudinary(req.files.video[0].buffer, 'ruzann/blogs');
+                    body.videoUrl = await uploadToCloudinary(req.files.video[0].buffer, 'ruzann/blogs');
                 } catch (uploadErr) {
                     console.error("Blog Video Upload Error:", uploadErr);
                 }
             }
         }
 
-        const blog = await Blog.create(req.body);
+        const blog = await Blog.create(body);
         res.status(201).json({ success: true, data: blog });
     } catch (err) {
         console.error("CREATE BLOG ERROR:", err);
@@ -59,29 +98,50 @@ exports.createBlog = async (req, res) => {
 // Update blog
 exports.updateBlog = async (req, res) => {
     try {
-        // If title changed, update slug
-        if (req.body.title) {
-            req.body.slug = req.body.title.toLowerCase().replace(/ /g, '-').replace(/[^\w-]+/g, '');
+        const body = { ...req.body };
+
+        // Handle FAQs
+        if (typeof body.faqs === 'string') {
+            body.faqs = JSON.parse(body.faqs);
+        }
+
+        // Handle Keywords
+        if (typeof body.keywords === 'string') {
+            body.keywords = body.keywords.split(',').map(k => k.trim());
+        }
+
+        // Recalculate stats if content changed
+        if (body.content) {
+            const stats = calculateReadTime(body.content);
+            body.readingTime = stats.minutes;
+            body.readTimeText = stats.text;
+            body.wordCount = stats.wordCount;
         }
 
         if (req.files) {
             if (req.files.image) {
                 try {
-                    req.body.image = await uploadToCloudinary(req.files.image[0].buffer, 'ruzann/blogs');
+                    const compressedBuffer = await sharp(req.files.image[0].buffer)
+                        .resize(1200, 630, { fit: 'cover' })
+                        .webp({ quality: 80 })
+                        .toBuffer();
+                    
+                    body.image = await uploadToCloudinary(compressedBuffer, 'ruzann/blogs');
                 } catch (uploadErr) {
                     console.error("Blog Image Update Error:", uploadErr);
+                    body.image = await uploadToCloudinary(req.files.image[0].buffer, 'ruzann/blogs');
                 }
             }
             if (req.files.video) {
                 try {
-                    req.body.videoUrl = await uploadToCloudinary(req.files.video[0].buffer, 'ruzann/blogs');
+                    body.videoUrl = await uploadToCloudinary(req.files.video[0].buffer, 'ruzann/blogs');
                 } catch (uploadErr) {
                     console.error("Blog Video Update Error:", uploadErr);
                 }
             }
         }
         
-        const blog = await Blog.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+        const blog = await Blog.findByIdAndUpdate(req.params.id, body, { new: true, runValidators: true });
         if (!blog) return res.status(404).json({ success: false, message: 'Blog not found' });
         res.status(200).json({ success: true, data: blog });
     } catch (err) {
