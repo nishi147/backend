@@ -23,6 +23,11 @@ exports.protect = async (req, res, next) => {
         if (!req.user) {
             return res.status(401).json({ success: false, message: 'Account no longer exists' });
         }
+
+        if (req.user.role !== 'admin' && !req.user.isVerified) {
+            console.log(`[AUTH DEBUG] Protected route BLOCKED for unverified user: ${req.user.email}`);
+            return res.status(401).json({ success: false, message: 'Please verify your email to access this resource', isVerified: false });
+        }
         
         next();
       } catch (err) {

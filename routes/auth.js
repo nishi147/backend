@@ -1,5 +1,5 @@
 const express = require('express');
-const { register, login, logout, getMe, forgotPassword, resetPassword, sendOtp, verifyOtpResetPassword } = require('../controllers/authController');
+const { register, login, logout, getMe, forgotPassword, resetPassword, sendOtp, verifyOtpResetPassword, verifyEmail, resendVerificationEmail } = require('../controllers/authController');
 const { protect } = require('../middleware/auth');
 
 const router = express.Router();
@@ -14,6 +14,10 @@ router.get('/me', protect, getMe);
 
 router.post('/forgotpassword', forgotPassword);
 router.put('/resetpassword/:resettoken', resetPassword);
+
+// Email verification
+router.post('/verify-email', verifyEmail);
+router.post('/resend-verification', resendVerificationEmail);
 
 // OTP-based password reset
 router.post('/send-otp', sendOtp);

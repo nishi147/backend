@@ -26,6 +26,9 @@ const UserSchema = new mongoose.Schema({
     resetPasswordExpire: Date,
     otpPasswordToken: String,
     otpPasswordExpire: Date,
+    isVerified: { type: Boolean, default: false },
+    emailVerificationToken: String,
+    emailVerificationExpire: Date,
     progress: [{
         courseId: { type: mongoose.Schema.Types.ObjectId, ref: 'Course' },
         completedLessons: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Lesson' }]
@@ -64,6 +67,24 @@ UserSchema.methods.getResetPasswordToken = function() {
   this.resetPasswordExpire = Date.now() + 10 * 60 * 1000; // 10 mins
 
   return resetToken;
+};
+
+// Generate and hash email verification token
+UserSchema.methods.getEmailVerificationToken = function() {
+  const crypto = require('crypto');
+  // Generate token
+  const verificationToken = crypto.randomBytes(20).toString('hex');
+
+  // Hash token and set to emailVerificationToken field
+  this.emailVerificationToken = crypto
+    .createHash('sha256')
+    .update(verificationToken)
+    .digest('hex');
+
+  // Set expire to 24 hours
+  this.emailVerificationExpire = Date.now() + 24 * 60 * 60 * 1000;
+
+  return verificationToken;
 };
 
 module.exports = mongoose.model('User', UserSchema);

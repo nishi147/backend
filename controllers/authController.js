@@ -38,10 +38,13 @@ const sendTokenResponse = (user, statusCode, res) => {
 exports.register = async (req, res) => {
     try {
         const { name, email, phone, password, role } = req.body;
+        const normalizedEmail = email.toLowerCase().trim();
+        console.log(`[AUTH DEBUG] Registering user: ${normalizedEmail}`);
 
         // Check if user exists
-        let user = await User.findOne({ email });
+        let user = await User.findOne({ email: normalizedEmail });
         if (user) {
+            console.log(`[AUTH DEBUG] User already exists: ${normalizedEmail}`);
             return res.status(400).json({ success: false, message: 'User already exists' });
         }
 
@@ -56,7 +59,7 @@ exports.register = async (req, res) => {
 
         user = await User.create({
             name,
-            email,
+            email: normalizedEmail,
             phone,
             password,
             role: role || 'student',
@@ -64,8 +67,50 @@ exports.register = async (req, res) => {
             profilePicture
         });
 
+        console.log(`[AUTH DEBUG] User created in DB. ID: ${user._id}, isVerified: ${user.isVerified}`);
 
-        sendTokenResponse(user, 201, res);
+        // 1. Generate Email Verification Token
+        const verificationToken = user.getEmailVerificationToken();
+        await user.save({ validateBeforeSave: false });
+
+        // 2. Create verification URL
+        const verifyUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/verify-email?token=${verificationToken}`;
+
+        // 3. Send Email
+        const html = `
+          <div style="font-family:'Segoe UI',sans-serif;max-width:480px;margin:auto;background:#f9f9f9;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);">
+            <div style="background:linear-gradient(135deg,#1f2937,#4f46e5);padding:32px 24px;text-align:center;">
+              <h1 style="color:white;margin:0;font-size:28px;font-weight:900;">Welcome to RUZANN 🚀</h1>
+              <p style="color:rgba(255,255,255,0.85);margin:6px 0 0;font-size:14px;">Verify your email</p>
+            </div>
+            <div style="padding:32px 24px;background:white;">
+              <p style="color:#374151;font-size:16px;margin:0 0 16px;">Hi <strong>${user.name}</strong>,</p>
+              <p style="color:#6B7280;font-size:14px;margin:0 0 24px;">Thank you for registering. Please click the button below to verify your email address and activate your account.</p>
+              <div style="text-align:center;margin-bottom:24px;">
+                <a href="${verifyUrl}" style="display:inline-block;background:#4f46e5;color:white;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:8px;font-size:16px;">Verify My Email</a>
+              </div>
+              <p style="color:#9CA3AF;font-size:12px;margin:0;">If you didn't mean to create an account, you can safely ignore this email.</p>
+            </div>
+          </div>
+        `;
+
+        const emailResult = await sendEmail({
+            email: user.email,
+            subject: 'Verify Your Email Address - RUZANN',
+            message: `Please verify your email clicking this link: ${verifyUrl}`,
+            html
+        });
+
+        if (!emailResult) {
+            console.error(`[EMAIL DEBUG] Verification email FAILED to send to ${user.email}`);
+            user.emailVerificationToken = undefined;
+            user.emailVerificationExpire = undefined;
+            await user.save({ validateBeforeSave: false });
+            return res.status(500).json({ success: false, message: 'User created, but email could not be sent' });
+        }
+
+        console.log(`[EMAIL DEBUG] Verification email sent successfully to ${user.email}`);
+        res.status(201).json({ success: true, message: 'Verification email sent. Please verify your email before logging in.' });
     } catch (error) {
         console.error("Register Error:", error);
         res.status(500).json({ success: false, message: 'Server error in register', error: error.message });
@@ -86,6 +131,18 @@ exports.login = async (req, res) => {
 
         if (!user) {
             return res.status(401).json({ success: false, message: 'Invalid credentials' });
+        }
+
+        // Check if user is verified
+        console.log(`[AUTH DEBUG] Login attempt for ${user.email}. Role: ${user.role}, isVerified: ${user.isVerified}`);
+        if (user.role !== 'admin' && !user.isVerified) {
+            console.log(`[AUTH DEBUG] Login BLOCKED for unverified user: ${user.email}`);
+            return res.status(401).json({ 
+                success: false, 
+                message: 'Please verify your email before logging in',
+                email: user.email,
+                isVerified: false
+            });
         }
 
         const isMatch = await user.matchPassword(password);
@@ -335,4 +392,94 @@ exports.verifyOtpResetPassword = async (req, res) => {
     console.error('Verify OTP Reset Error:', error);
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
+};
+
+// @desc    Verify Email
+// @route   POST /api/auth/verify-email
+// @access  Public
+exports.verifyEmail = async (req, res) => {
+    try {
+        const { token } = req.body;
+        if (!token) {
+            return res.status(400).json({ success: false, message: 'Token is required' });
+        }
+
+        const emailVerificationToken = crypto
+            .createHash('sha256')
+            .update(token)
+            .digest('hex');
+
+        const user = await User.findOne({
+            emailVerificationToken,
+            emailVerificationExpire: { $gt: Date.now() }
+        });
+
+        if (!user) {
+            return res.status(400).json({ success: false, message: 'Invalid or expired verification token' });
+        }
+
+        user.isVerified = true;
+        user.emailVerificationToken = undefined;
+        user.emailVerificationExpire = undefined;
+        await user.save();
+
+        res.status(200).json({ success: true, message: 'Email verified successfully. You can now log in.' });
+    } catch (error) {
+        console.error("Verify Email Error:", error);
+        res.status(500).json({ success: false, message: 'Server error during email verification', error: error.message });
+    }
+};
+
+// @desc    Resend Verification Email
+// @route   POST /api/auth/resend-verification
+// @access  Public
+exports.resendVerificationEmail = async (req, res) => {
+    try {
+        const { email } = req.body;
+        if (!email) {
+            return res.status(400).json({ success: false, message: 'Email is required' });
+        }
+
+        const user = await User.findOne({ email: email.toLowerCase().trim() });
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'User not found' });
+        }
+
+        if (user.isVerified) {
+            return res.status(400).json({ success: false, message: 'User is already verified' });
+        }
+
+        const verificationToken = user.getEmailVerificationToken();
+        await user.save({ validateBeforeSave: false });
+
+        const verifyUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/verify-email?token=${verificationToken}`;
+
+        const html = `
+          <div style="font-family:'Segoe UI',sans-serif;max-width:480px;margin:auto;background:#f9f9f9;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);">
+            <div style="background:linear-gradient(135deg,#1f2937,#4f46e5);padding:32px 24px;text-align:center;">
+              <h1 style="color:white;margin:0;font-size:28px;font-weight:900;">RUZANN 🚀</h1>
+              <p style="color:rgba(255,255,255,0.85);margin:6px 0 0;font-size:14px;">Verify your email</p>
+            </div>
+            <div style="padding:32px 24px;background:white;">
+              <p style="color:#374151;font-size:16px;margin:0 0 16px;">Hi <strong>${user.name}</strong>,</p>
+              <p style="color:#6B7280;font-size:14px;margin:0 0 24px;">Please click the button below to verify your email address and activate your account.</p>
+              <div style="text-align:center;margin-bottom:24px;">
+                <a href="${verifyUrl}" style="display:inline-block;background:#4f46e5;color:white;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:8px;font-size:16px;">Verify My Email</a>
+              </div>
+            </div>
+          </div>
+        `;
+
+        await sendEmail({
+            email: user.email,
+            subject: 'Verify Your Email Address - RUZANN',
+            message: `Please verify your email clicking this link: ${verifyUrl}`,
+            html
+        });
+
+        res.status(200).json({ success: true, message: 'Verification email resent' });
+    } catch (error) {
+        console.error("Resend Verification Error:", error);
+        res.status(500).json({ success: false, message: 'Server error while resending verification email' });
+    }
 };

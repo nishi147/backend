@@ -90,7 +90,7 @@ exports.verifyPayment = async (req, res) => {
         if (razorpay_signature === expectedSign) {
             // Payment is successful
             // Create payment record
-            const course = await Course.findById(courseId);
+            const course = await Course.findById(courseId).populate('teacher');
             const payment = await Payment.create({
                 payment_id: razorpay_payment_id,
                 order_id: razorpay_order_id,
@@ -142,11 +142,39 @@ exports.verifyPayment = async (req, res) => {
             }
 
             // Send Confirmation Email
+            const instructorName = course.teacher && course.teacher.name ? course.teacher.name : 'RUZANN Instructor';
+            
+            const html = `
+              <div style="font-family:'Segoe UI',sans-serif;max-width:500px;margin:auto;background:#f9f9f9;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);">
+                <div style="background:linear-gradient(135deg,#1f2937,#4f46e5);padding:32px 24px;text-align:center;">
+                  <h1 style="color:white;margin:0;font-size:28px;font-weight:900;">Enrollment Confirmed 🎒</h1>
+                  <p style="color:rgba(255,255,255,0.85);margin:6px 0 0;font-size:14px;">Welcome to the course!</p>
+                </div>
+                <div style="padding:32px 24px;background:white;">
+                  <p style="color:#374151;font-size:16px;margin:0 0 16px;">Hi <strong>${req.user.name}</strong>,</p>
+                  <p style="color:#6B7280;font-size:14px;margin:0 0 16px;">Payment successful! We are thrilled to have you enrolled in <strong>${course.title}</strong>.</p>
+                  <div style="background:#F3F4F6;border-left:4px solid #4f46e5;padding:16px;border-radius:4px;margin-bottom:24px;">
+                    <p style="margin:0 0 8px;font-size:14px;color:#374151;"><strong>Course Details:</strong></p>
+                    <ul style="margin:0;padding-left:20px;font-size:14px;color:#4B5563;">
+                      <li><strong>Course Name:</strong> ${course.title}</li>
+                      <li><strong>Modules:</strong> ${sessions}</li>
+                      <li><strong>Instructor:</strong> ${instructorName}</li>
+                    </ul>
+                  </div>
+                  <p style="color:#6B7280;font-size:14px;margin:0 0 24px;">You can access your course materials and schedule directly from your student dashboard.</p>
+                  <div style="text-align:center;margin-bottom:24px;">
+                    <a href="${process.env.CLIENT_URL || 'https://ruzann.com'}/dashboard/student/courses" style="display:inline-block;background:#4f46e5;color:white;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:8px;font-size:16px;">Go to Dashboard</a>
+                  </div>
+                  <p style="color:#9CA3AF;font-size:12px;margin:0;">Happy Learning!<br>Team RUZANN</p>
+                </div>
+              </div>
+            `;
+
             await sendEmail({
                 email: req.user.email,
-                subject: `Welcome to ${course.title}! 🎒`,
-                message: `Hi ${req.user.name},\n\nPayment successful! You are now enrolled in ${course.title} (${sessions} Modules). Log in to your dashboard to start learning.\n\nHappy Learning!\nTeam RUZANN`,
-                html: `<h1>Welcome to ${course.title}! 🎒</h1><p>Hi ${req.user.name},</p><p>Payment successful! You are now enrolled in <strong>${course.title}</strong> (Total Modules: ${sessions}).</p><p>Log in to your dashboard to start learning.</p><p>Happy Learning!<br>Team RUZANN</p>`
+                subject: `Enrollment Confirmed - RUZANN`,
+                message: `Hi ${req.user.name},\n\nPayment successful! You are enrolled in ${course.title} with instructor ${instructorName}. Modules: ${sessions}.\n\nLog in to your dashboard to start learning.\nTeam RUZANN`,
+                html
             });
 
             return res.status(200).json({ success: true, message: "Payment verified successfully" });
