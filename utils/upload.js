@@ -9,19 +9,19 @@ const storage = multer.memoryStorage(); // Vercel-safe memory storage
 
 // Check file type
 function checkFileType(file, cb) {
-  // Allow images and CSV files
-  const filetypes = /jpeg|jpg|png|gif|webp|heic|heif|csv/;
+  // Allow images, CSV and PDF files
+  const filetypes = /jpeg|jpg|png|gif|webp|heic|heif|csv|pdf/;
   
   // Extension checking can be tricky on mobile, some browsers don't append it correctly
   const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
-  const mimetype = filetypes.test(file.mimetype) || file.mimetype === 'text/csv';
+  const mimetype = filetypes.test(file.mimetype) || file.mimetype === 'text/csv' || file.mimetype === 'application/pdf';
 
   // If mimetype is correct, we should generally allow it. 
   // It's safer to rely on mimetype for mobile uploads where extension might be missing.
   if (mimetype || extname) {
     return cb(null, true);
   } else {
-    cb(new Error(`Error: Invalid file type! Received name: ${file.originalname}, type: ${file.mimetype}. Allowed types: jpeg, jpg, png, gif, webp, heic, csv`));
+    cb(new Error(`Error: Invalid file type! Received name: ${file.originalname}, type: ${file.mimetype}. Allowed types: jpeg, jpg, png, gif, webp, heic, csv, pdf`));
   }
 }
 
