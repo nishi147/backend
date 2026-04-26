@@ -164,6 +164,8 @@ app.use('/api/attendance', require('./routes/attendance'));
 app.use('/api/rewards', require('./routes/rewards'));
 app.use('/api/reviews', require('./routes/reviews'));
 app.use('/api/minigames', require('./routes/minigames'));
+app.use('/api/registrations', require('./routes/studentRegistrations'));
+
 
 
 // Start server only for local development

@@ -221,7 +221,7 @@ exports.forgotPassword = async (req, res, next) => {
   
   let user;
   try {
-    user = await User.findOne({ email: req.body.email });
+    user = await User.findOne({ email: req.body.email?.toLowerCase().trim() });
 
     if (!user) {
       console.log('User not found');

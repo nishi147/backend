@@ -7,6 +7,8 @@ const UserSchema = new mongoose.Schema({
         type: String, 
         required: true, 
         unique: true,
+        lowercase: true,
+        trim: true,
         match: [/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/, 'Please add a valid email']
     },
     phone: { 
@@ -16,7 +18,7 @@ const UserSchema = new mongoose.Schema({
     password: { type: String, required: true, select: false },
     role: { type: String, enum: ['student', 'teacher', 'admin', 'sales'], default: 'student' },
     isApprovedTeacher: { type: Boolean, default: false }, // Admins must approve teachers
-    isApprovedStudent: { type: Boolean, default: false }, // Admins must approve students
+    isApprovedStudent: { type: Boolean, default: true }, // Students approved by default now
     specialization: { type: String, default: '' }, // e.g., "Coding Expert", "Math Wizard"
     systemCode: { type: String, unique: true, sparse: true }, // RU-ADM-A01
     profilePicture: { type: String, default: '' },

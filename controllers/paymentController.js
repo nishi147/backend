@@ -12,6 +12,7 @@ const Sale = require('../models/Sale');
 const Lead = require('../models/Lead');
 const Bootcamp = require('../models/Bootcamp');
 const BootcampBooking = require('../models/BootcampBooking');
+const StudentRegistration = require('../models/StudentRegistration');
 
 const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID,
@@ -312,7 +313,7 @@ exports.createWorkshopOrder = async (req, res) => {
 // @access  Private (Authenticated)
 exports.verifyWorkshopPayment = async (req, res) => {
     try {
-        const { razorpay_order_id, razorpay_payment_id, razorpay_signature, workshopId, slotId } = req.body;
+        const { razorpay_order_id, razorpay_payment_id, razorpay_signature, workshopId, slotId, registrationId } = req.body;
 
         if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
             return res.status(400).json({ success: false, message: "Missing payment identifiers" });
@@ -335,7 +336,7 @@ exports.verifyWorkshopPayment = async (req, res) => {
         
         // Create workshop booking record
         await WorkshopBooking.create({
-            user: req.user.id,
+            user: req.user?.id,
             workshop: workshopId,
             slotId: slotId || undefined,
             paymentId: razorpay_payment_id,
@@ -343,6 +344,16 @@ exports.verifyWorkshopPayment = async (req, res) => {
             amount: workshop.price,
             status: 'success'
         });
+
+        // Update StudentRegistration if exists
+        if (registrationId) {
+            await StudentRegistration.findByIdAndUpdate(registrationId, {
+                status: 'success',
+                paymentId: razorpay_payment_id,
+                orderId: razorpay_order_id,
+                amount: workshop.price
+            });
+        }
 
         // Handle Slot Booked Count
         let slotDetailsTxt = '';
@@ -360,12 +371,25 @@ exports.verifyWorkshopPayment = async (req, res) => {
         }
 
         // Send Confirmation Email
-        await sendEmail({
-            email: req.user.email,
-            subject: `Seat Confirmed: ${workshop.title}! 🎟️`,
-            message: `Hi ${req.user.name},\n\nYour seat is booked for: ${workshop.title}.\nDate: ${new Date(workshop.date).toLocaleDateString()}${slotDetailsTxt}\nVenue: ${workshop.venue}\n\nSee you there!\nTeam RUZANN`,
-            html: `<h1>Seat Confirmed! 🎟️</h1><p>Hi ${req.user.name},</p><p>You are booked for: <strong>${workshop.title}</strong>.</p><p><strong>Date:</strong> ${new Date(workshop.date).toLocaleDateString()}${slotDetailsHtml}<br><strong>Venue:</strong> ${workshop.venue}</p><p>See you there!<br>Team RUZANN</p>`
-        });
+        let targetEmail = req.user?.email;
+        let targetName = req.user?.name;
+
+        if (registrationId) {
+            const reg = await StudentRegistration.findById(registrationId);
+            if (reg) {
+                if (!targetEmail) targetEmail = reg.email;
+                if (!targetName) targetName = reg.name;
+            }
+        }
+
+        if (targetEmail) {
+            await sendEmail({
+                email: targetEmail,
+                subject: `Seat Confirmed: ${workshop.title}! 🎟️`,
+                message: `Hi ${targetName},\n\nYour seat is booked for: ${workshop.title}.\nDate: ${new Date(workshop.date).toLocaleDateString()}${slotDetailsTxt}\nVenue: ${workshop.venue}\n\nSee you there!\nTeam RUZANN`,
+                html: `<h1>Seat Confirmed! 🎟️</h1><p>Hi ${targetName},</p><p>You are booked for: <strong>${workshop.title}</strong>.</p><p><strong>Date:</strong> ${new Date(workshop.date).toLocaleDateString()}${slotDetailsHtml}<br><strong>Venue:</strong> ${workshop.venue}</p><p>See you there!<br>Team RUZANN</p>`
+            });
+        }
 
         return res.status(200).json({ success: true, message: "Workshop booking confirmed" });
 
@@ -422,7 +446,8 @@ exports.verifyBootcampPayment = async (req, res) => {
             guestName,
             guestEmail,
             guestPhone,
-            guestAge
+            guestAge,
+            registrationId
         } = req.body;
 
         if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
@@ -457,6 +482,16 @@ exports.verifyBootcampPayment = async (req, res) => {
             amount: bootcamp.price,
             status: 'success'
         });
+
+        // Update StudentRegistration if exists
+        if (registrationId) {
+            await StudentRegistration.findByIdAndUpdate(registrationId, {
+                status: 'success',
+                paymentId: razorpay_payment_id,
+                orderId: razorpay_order_id,
+                amount: bootcamp.price
+            });
+        }
 
         // Send Confirmation Email
         const targetEmail = req.user ? req.user.email : guestEmail;
