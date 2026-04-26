@@ -38,11 +38,11 @@ const sendTokenResponse = (user, statusCode, res) => {
 exports.register = async (req, res) => {
     try {
         const { name, email, phone, password, role } = req.body;
-        const trimmedEmail = email.trim();
-        console.log(`[AUTH DEBUG] Registering user: ${trimmedEmail}`);
+        const normalizedEmail = email.toLowerCase().trim();
+        console.log(`[AUTH DEBUG] Registering user: ${normalizedEmail}`);
 
         // Check if user exists
-        let user = await User.findOne({ email: trimmedEmail });
+        let user = await User.findOne({ email: normalizedEmail });
         if (user) {
             console.log(`[AUTH DEBUG] User already exists: ${normalizedEmail}`);
             return res.status(400).json({ success: false, message: 'User already exists' });
@@ -59,7 +59,7 @@ exports.register = async (req, res) => {
 
         user = await User.create({
             name,
-            email: trimmedEmail,
+            email: normalizedEmail,
             phone,
             password,
             role: role || 'student',
@@ -125,9 +125,9 @@ exports.login = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Please provide an email and password' });
         }
 
-        // Use original case-sensitive email lookup
-        const trimmedEmail = email.trim();
-        const user = await User.findOne({ email: trimmedEmail }).select('+password');
+        // Normalize email for case-insensitive lookup
+        const normalizedEmail = email.toLowerCase().trim();
+        const user = await User.findOne({ email: normalizedEmail }).select('+password');
 
         if (!user) {
             return res.status(401).json({ success: false, message: 'Invalid credentials' });
@@ -440,7 +440,7 @@ exports.resendVerificationEmail = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Email is required' });
         }
 
-        const user = await User.findOne({ email: email.trim() });
+        const user = await User.findOne({ email: email.toLowerCase().trim() });
         if (!user) {
             return res.status(404).json({ success: false, message: 'User not found' });
         }
