@@ -9,8 +9,8 @@ const app = express();
 
 // Database Connection
 mongoose.connect(process.env.MONGODB_URI, {
-    family: 4, // Force IPv4 to avoid DNS loop issues with SRV
-    serverSelectionTimeoutMS: 5000 // 5 seconds timeout
+    family: 4, 
+    serverSelectionTimeoutMS: 30000 
 })
     .then(() => console.log('Connected to MongoDB'))
     .catch((err) => console.error('MongoDB connection error:', err));
@@ -27,14 +27,11 @@ const allowedOrigins = [
 
 app.use(cors({
     origin: function (origin, callback) {
-        // allow requests with no origin (like mobile apps or curl requests)
         if (!origin) return callback(null, true);
-        if (allowedOrigins.indexOf(origin) === -1 && !origin.includes('vercel.app')) {
-            const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-            // return callback(new Error(msg), false);
-            return callback(null, true); // Fallback to allow for now if debugging
+        if (allowedOrigins.indexOf(origin) !== -1 || origin.includes('vercel.app')) {
+            return callback(null, true);
         }
-        return callback(null, true);
+        return callback(null, true); // Permissive for now to fix production
     },
     credentials: true,
 }));
@@ -86,8 +83,10 @@ app.use((err, req, res, next) => {
 
 // Start server
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-});
+if (process.env.NODE_ENV !== 'production') {
+    app.listen(PORT, () => {
+        console.log(`Server running on port ${PORT}`);
+    });
+}
 
 module.exports = app;
