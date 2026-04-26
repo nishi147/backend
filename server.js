@@ -8,10 +8,7 @@ const path = require('path');
 const app = express();
 
 // Database Connection
-mongoose.connect(process.env.MONGODB_URI, {
-    family: 4, 
-    serverSelectionTimeoutMS: 30000 
-})
+mongoose.connect(process.env.MONGODB_URI)
     .then(() => console.log('Connected to MongoDB'))
     .catch((err) => console.error('MongoDB connection error:', err));
 
@@ -31,13 +28,12 @@ app.use(cors({
         if (allowedOrigins.indexOf(origin) !== -1 || origin.includes('vercel.app')) {
             return callback(null, true);
         }
-        return callback(null, true); // Permissive for now to fix production
+        return callback(null, true);
     },
     credentials: true,
 }));
 
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json());
 app.use(cookieParser());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
@@ -70,16 +66,6 @@ app.use('/api/reviews', require('./routes/reviews'));
 app.use('/api/minigames', require('./routes/minigames'));
 app.use('/api/mentors', require('./routes/mentors'));
 app.use('/api/student-details', require('./routes/studentDetails'));
-
-// Global Error Handler
-app.use((err, req, res, next) => {
-    console.error("GLOBAL SERVER ERROR:", err);
-    const statusCode = err.status || err.statusCode || 500;
-    res.status(statusCode).json({
-        success: false,
-        message: err.message || 'Server error'
-    });
-});
 
 // Start server
 const PORT = process.env.PORT || 5000;
