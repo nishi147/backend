@@ -36,12 +36,18 @@ exports.createCoupon = async (req, res) => {
 // @access  Public
 exports.validateCoupon = async (req, res) => {
     try {
-        const { code } = req.body;
-        const coupon = await Coupon.findOne({ 
+        const { code, productType } = req.body;
+        const query = { 
             code: code.toUpperCase(), 
             isActive: true,
             expiryDate: { $gt: Date.now() }
-        });
+        };
+
+        if (productType) {
+            query.applicableTo = productType;
+        }
+
+        const coupon = await Coupon.findOne(query);
 
         if (!coupon) {
             return res.status(404).json({ success: false, message: 'Invalid or expired coupon' });

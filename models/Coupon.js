@@ -17,6 +17,11 @@ const CouponSchema = new mongoose.Schema({
         type: Number, 
         required: true 
     },
+    applicableTo: {
+        type: [String],
+        enum: ['course', 'bootcamp', 'workshop'],
+        default: ['course', 'bootcamp', 'workshop']
+    },
     createdBy: { 
         type: mongoose.Schema.Types.ObjectId, 
         ref: 'User',
