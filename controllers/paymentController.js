@@ -267,7 +267,8 @@ exports.verifyIntroPayment = async (req, res) => {
 // @access  Private (Authenticated)
 exports.createWorkshopOrder = async (req, res) => {
     try {
-        const { workshopId, slotId } = req.body;
+        const { workshopId, slotId, couponCode, amount: passedAmount } = req.body;
+        const Coupon = require('../models/Coupon');
         
         if (!workshopId) {
             return res.status(400).json({ success: false, message: 'Workshop ID is required' });
@@ -289,14 +290,34 @@ exports.createWorkshopOrder = async (req, res) => {
             }
         }
 
+        let amount = passedAmount !== undefined ? passedAmount : workshop.price;
+        let discountAmount = 0;
+
+        if (couponCode && passedAmount === undefined) {
+            const coupon = await Coupon.findOne({ 
+                code: couponCode.toUpperCase(), 
+                isActive: true, 
+                expiryDate: { $gt: Date.now() } 
+            });
+            if (coupon) {
+                if (coupon.discountType === 'percent') {
+                    discountAmount = (amount * coupon.discountValue) / 100;
+                } else {
+                    discountAmount = coupon.discountValue;
+                }
+                amount = Math.max(0, amount - discountAmount);
+            }
+        }
+
         const options = {
-            amount: Math.round(workshop.price * 100), // Ensure integer paise
+            amount: Math.round(amount * 100), // Ensure integer paise
             currency: 'INR',
             receipt: `workshop_order_${Date.now()}`,
             notes: {
                 workshopId,
                 slotId: slotId || '',
-                userId: req.user?.id
+                userId: req.user?.id,
+                couponCode: couponCode || ''
             }
         };
 
@@ -313,7 +334,7 @@ exports.createWorkshopOrder = async (req, res) => {
 // @access  Private (Authenticated)
 exports.verifyWorkshopPayment = async (req, res) => {
     try {
-        const { razorpay_order_id, razorpay_payment_id, razorpay_signature, workshopId, slotId, registrationId } = req.body;
+        const { razorpay_order_id, razorpay_payment_id, razorpay_signature, workshopId, slotId, registrationId, amount, couponCode } = req.body;
 
         if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
             return res.status(400).json({ success: false, message: "Missing payment identifiers" });
@@ -334,6 +355,8 @@ exports.verifyWorkshopPayment = async (req, res) => {
             return res.status(404).json({ success: false, message: "Workshop details not found" });
         }
         
+        const finalAmount = amount !== undefined ? amount : workshop.price;
+
         // Create workshop booking record
         await WorkshopBooking.create({
             user: req.user?.id,
@@ -341,7 +364,7 @@ exports.verifyWorkshopPayment = async (req, res) => {
             slotId: slotId || undefined,
             paymentId: razorpay_payment_id,
             orderId: razorpay_order_id,
-            amount: workshop.price,
+            amount: finalAmount,
             status: 'success'
         });
 
@@ -351,8 +374,26 @@ exports.verifyWorkshopPayment = async (req, res) => {
                 status: 'success',
                 paymentId: razorpay_payment_id,
                 orderId: razorpay_order_id,
-                amount: workshop.price
+                amount: finalAmount
             });
+        }
+
+        // Handle Coupon/Sale Tracking
+        if (couponCode) {
+            const coupon = await Coupon.findOne({ code: couponCode.toUpperCase() });
+            if (coupon) {
+                const originalAmount = workshop.price;
+                const calculatedDiscount = originalAmount - finalAmount;
+
+                await Sale.create({
+                    userId: req.user ? req.user.id : undefined,
+                    salesUserId: coupon.createdBy,
+                    couponCode: coupon.code,
+                    originalAmount: originalAmount,
+                    discountAmount: calculatedDiscount,
+                    finalAmount: finalAmount
+                });
+            }
         }
 
         // Handle Slot Booked Count
@@ -404,7 +445,8 @@ exports.verifyWorkshopPayment = async (req, res) => {
 // @access  Private (Authenticated)
 exports.createBootcampOrder = async (req, res) => {
     try {
-        const { bootcampId } = req.body;
+        const { bootcampId, couponCode, amount: passedAmount } = req.body;
+        const Coupon = require('../models/Coupon');
         
         if (!bootcampId) {
             return res.status(400).json({ success: false, message: 'Bootcamp ID is required' });
@@ -415,18 +457,38 @@ exports.createBootcampOrder = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Bootcamp not found' });
         }
 
+        let amount = passedAmount !== undefined ? passedAmount : bootcamp.price;
+        let discountAmount = 0;
+
+        if (couponCode && passedAmount === undefined) {
+            const coupon = await Coupon.findOne({ 
+                code: couponCode.toUpperCase(), 
+                isActive: true,
+                expiryDate: { $gt: Date.now() }
+            });
+            if (coupon) {
+                if (coupon.discountType === 'percent') {
+                    discountAmount = (amount * coupon.discountValue) / 100;
+                } else {
+                    discountAmount = coupon.discountValue;
+                }
+                amount = Math.max(0, amount - discountAmount);
+            }
+        }
+
         const options = {
-            amount: Math.round(bootcamp.price * 100), // Ensure integer paise
+            amount: Math.round(amount * 100), // Ensure integer paise
             currency: 'INR',
             receipt: `bootcamp_order_${Date.now()}`,
             notes: {
                 bootcampId,
-                userId: req.user?.id
+                userId: req.user?.id,
+                couponCode: couponCode || ''
             }
         };
 
         const order = await razorpay.orders.create(options);
-        res.status(200).json({ success: true, data: order });
+        res.status(200).json({ success: true, data: order, calculatedAmount: amount });
     } catch (error) {
         console.error("Bootcamp Order Error:", error);
         res.status(500).json({ success: false, message: 'Failed to create bootcamp order' });
@@ -447,7 +509,9 @@ exports.verifyBootcampPayment = async (req, res) => {
             guestEmail,
             guestPhone,
             guestAge,
-            registrationId
+            registrationId,
+            amount,
+            couponCode
         } = req.body;
 
         if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
@@ -469,6 +533,8 @@ exports.verifyBootcampPayment = async (req, res) => {
             return res.status(404).json({ success: false, message: "Bootcamp details not found" });
         }
         
+        const finalAmount = amount !== undefined ? amount : bootcamp.price;
+
         // Create bootcamp booking record
         await BootcampBooking.create({
             user: req.user ? req.user.id : undefined,
@@ -479,7 +545,7 @@ exports.verifyBootcampPayment = async (req, res) => {
             guestAge,
             paymentId: razorpay_payment_id,
             orderId: razorpay_order_id,
-            amount: bootcamp.price,
+            amount: finalAmount,
             status: 'success'
         });
 
@@ -489,8 +555,26 @@ exports.verifyBootcampPayment = async (req, res) => {
                 status: 'success',
                 paymentId: razorpay_payment_id,
                 orderId: razorpay_order_id,
-                amount: bootcamp.price
+                amount: finalAmount
             });
+        }
+
+        // Handle Coupon/Sale Tracking
+        if (couponCode) {
+            const coupon = await Coupon.findOne({ code: couponCode.toUpperCase() });
+            if (coupon) {
+                const originalAmount = bootcamp.price;
+                const calculatedDiscount = originalAmount - finalAmount;
+
+                await Sale.create({
+                    userId: req.user ? req.user.id : undefined,
+                    salesUserId: coupon.createdBy,
+                    couponCode: coupon.code,
+                    originalAmount: originalAmount,
+                    discountAmount: calculatedDiscount,
+                    finalAmount: finalAmount
+                });
+            }
         }
 
         // Send Confirmation Email
