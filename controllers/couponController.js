@@ -52,3 +52,26 @@ exports.validateCoupon = async (req, res) => {
         res.status(400).json({ success: false, error: err.message });
     }
 };
+
+// @desc    Delete a coupon
+// @route   DELETE /api/coupons/:id
+// @access  Private (Sales, Admin)
+exports.deleteCoupon = async (req, res) => {
+    try {
+        const coupon = await Coupon.findById(req.params.id);
+        if (!coupon) {
+            return res.status(404).json({ success: false, error: 'Coupon not found' });
+        }
+        
+        // Make sure user is coupon owner or admin
+        const createdByStr = coupon.createdBy ? coupon.createdBy.toString() : '';
+        if (createdByStr !== req.user._id.toString() && req.user.role !== 'admin') {
+            return res.status(401).json({ success: false, error: 'Not authorized to delete this coupon' });
+        }
+
+        await coupon.deleteOne();
+        res.status(200).json({ success: true, data: {} });
+    } catch (err) {
+        res.status(400).json({ success: false, error: err.message });
+    }
+};
