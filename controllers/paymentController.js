@@ -13,18 +13,34 @@ const Lead = require('../models/Lead');
 const Bootcamp = require('../models/Bootcamp');
 const BootcampBooking = require('../models/BootcampBooking');
 const StudentRegistration = require('../models/StudentRegistration');
+const Currency = require('../models/Currency');
 
 const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID,
     key_secret: process.env.RAZORPAY_SECRET
 });
 
+// Helper to get Razorpay subunit multiplier based on currency code
+const getSubunitMultiplier = (currencyCode) => {
+    const code = (currencyCode || 'INR').toUpperCase();
+    // 3 decimal places
+    if (['BHD', 'KWD', 'OMR', 'JOD', 'LYD', 'TND'].includes(code)) {
+        return 1000;
+    }
+    // 0 decimal places
+    if (['JPY', 'KRW', 'CLP', 'VND', 'PYG'].includes(code)) {
+        return 1;
+    }
+    // Default (2 decimal places, e.g. INR, USD, EUR, GBP, AED, SAR, etc.)
+    return 100;
+};
+
 // @desc    Create Razorpay Order
 // @route   POST /api/payments/order
 // @access  Private (Student)
 exports.createOrder = async (req, res) => {
     try {
-        const { courseId, sessions, couponCode } = req.body;
+        const { courseId, sessions, couponCode, currency } = req.body;
         const Coupon = require('../models/Coupon');
         
         const course = await Course.findById(courseId);
@@ -55,11 +71,24 @@ exports.createOrder = async (req, res) => {
             }
         }
 
-        const finalAmountInPaise = Math.round(amount * 100);
+        let rate = 1;
+        let currencyCode = 'INR';
+        if (currency && currency !== 'INR') {
+            const currencyObj = await Currency.findOne({ code: currency.toUpperCase(), status: 'active' });
+            if (currencyObj) {
+                rate = currencyObj.exchangeRate;
+                if (rate <= 0) rate = 1;
+                currencyCode = currencyObj.code;
+            }
+        }
+
+        const convertedAmount = amount / rate;
+        const multiplier = getSubunitMultiplier(currencyCode);
+        const finalAmountInPaise = Math.round(convertedAmount * multiplier);
 
         const options = {
             amount: finalAmountInPaise,
-            currency: 'INR',
+            currency: currencyCode,
             receipt: `receipt_order_${Date.now()}`,
             notes: {
                 couponCode: couponCode || ''
@@ -193,9 +222,27 @@ exports.verifyPayment = async (req, res) => {
 // @access  Public
 exports.createIntroOrder = async (req, res) => {
     try {
+        const { currency } = req.body;
+        
+        let rate = 1;
+        let currencyCode = 'INR';
+        if (currency && currency !== 'INR') {
+            const currencyObj = await Currency.findOne({ code: currency.toUpperCase(), status: 'active' });
+            if (currencyObj) {
+                rate = currencyObj.exchangeRate;
+                if (rate <= 0) rate = 1;
+                currencyCode = currencyObj.code;
+            }
+        }
+
+        const baseAmount = 99;
+        const convertedAmount = baseAmount / rate;
+        const multiplier = getSubunitMultiplier(currencyCode);
+        const finalAmountInPaise = Math.round(convertedAmount * multiplier);
+
         const options = {
-            amount: 9900, // ₹99 = 9900 paise
-            currency: 'INR',
+            amount: finalAmountInPaise,
+            currency: currencyCode,
             receipt: `intro_order_${Date.now()}`,
         };
 
@@ -267,7 +314,7 @@ exports.verifyIntroPayment = async (req, res) => {
 // @access  Private (Authenticated)
 exports.createWorkshopOrder = async (req, res) => {
     try {
-        const { workshopId, slotId, couponCode, amount: passedAmount } = req.body;
+        const { workshopId, slotId, couponCode, amount: passedAmount, currency } = req.body;
         const Coupon = require('../models/Coupon');
         
         if (!workshopId) {
@@ -309,9 +356,24 @@ exports.createWorkshopOrder = async (req, res) => {
             }
         }
 
+        let rate = 1;
+        let currencyCode = 'INR';
+        if (currency && currency !== 'INR') {
+            const currencyObj = await Currency.findOne({ code: currency.toUpperCase(), status: 'active' });
+            if (currencyObj) {
+                rate = currencyObj.exchangeRate;
+                if (rate <= 0) rate = 1;
+                currencyCode = currencyObj.code;
+            }
+        }
+
+        const convertedAmount = amount / rate;
+        const multiplier = getSubunitMultiplier(currencyCode);
+        const finalAmountInPaise = Math.round(convertedAmount * multiplier);
+
         const options = {
-            amount: Math.round(amount * 100), // Ensure integer paise
-            currency: 'INR',
+            amount: finalAmountInPaise,
+            currency: currencyCode,
             receipt: `workshop_order_${Date.now()}`,
             notes: {
                 workshopId,
@@ -445,7 +507,7 @@ exports.verifyWorkshopPayment = async (req, res) => {
 // @access  Private (Authenticated)
 exports.createBootcampOrder = async (req, res) => {
     try {
-        const { bootcampId, couponCode, amount: passedAmount } = req.body;
+        const { bootcampId, couponCode, amount: passedAmount, currency } = req.body;
         const Coupon = require('../models/Coupon');
         
         if (!bootcampId) {
@@ -476,9 +538,24 @@ exports.createBootcampOrder = async (req, res) => {
             }
         }
 
+        let rate = 1;
+        let currencyCode = 'INR';
+        if (currency && currency !== 'INR') {
+            const currencyObj = await Currency.findOne({ code: currency.toUpperCase(), status: 'active' });
+            if (currencyObj) {
+                rate = currencyObj.exchangeRate;
+                if (rate <= 0) rate = 1;
+                currencyCode = currencyObj.code;
+            }
+        }
+
+        const convertedAmount = amount / rate;
+        const multiplier = getSubunitMultiplier(currencyCode);
+        const finalAmountInPaise = Math.round(convertedAmount * multiplier);
+
         const options = {
-            amount: Math.round(amount * 100), // Ensure integer paise
-            currency: 'INR',
+            amount: finalAmountInPaise,
+            currency: currencyCode,
             receipt: `bootcamp_order_${Date.now()}`,
             notes: {
                 bootcampId,
