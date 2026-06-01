@@ -57,6 +57,16 @@
 // });
 
 require('dotenv').config();
+
+// Configure custom DNS resolution to prevent local SRV query failures
+const dns = require('dns');
+try {
+  dns.setServers(['8.8.8.8', '1.1.1.1']);
+  console.log('--- Custom DNS Resolvers Configured (8.8.8.8, 1.1.1.1) ---');
+} catch (err) {
+  console.warn('--- Custom DNS setup failed, falling back to local resolver ---', err.message);
+}
+
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -152,6 +162,7 @@ app.use('/api/currencies', require('./routes/currencies'));
 app.use('/api/blogs', require('./routes/blogs'));
 app.use('/api/settings', require('./routes/settings'));
 app.use('/api/leads', require('./routes/leads'));
+app.use('/api/assessment-submissions', require('./routes/assessmentSubmissions'));
 app.use('/api/referrals', require('./routes/referrals'));
 app.use('/api/analytics', require('./routes/analytics'));
 app.use('/api/coupons', require('./routes/coupons'));
