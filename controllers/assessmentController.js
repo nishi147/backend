@@ -237,7 +237,7 @@ async function triggerEmailAutomation(submission) {
           <div style="text-align:center;margin-bottom:32px;">
             <h3 style="color:#1e293b;font-size:18px;font-weight:800;margin-top:0;">Secure a ₹99 Live Trial Class Session!</h3>
             <p style="color:#64748b;font-size:13px;margin:8px 0 20px;">Let them interact 1-on-1 with our AI mentors, play tech quizzes, and build their first AI-assisted project.</p>
-            <a href="${process.env.CLIENT_URL || 'https://ruzann.com'}/landingpage?claimOffer=true" style="display:inline-block;background:#ef4444;color:white;text-decoration:none;font-weight:800;padding:14px 28px;border-radius:12px;font-size:15px;box-shadow:0 4px 15px rgba(239,68,68,0.25);">🎯 Claim ₹99 Trial Session Now</a>
+            <a href="${process.env.CLIENT_URL || 'https://ruzann.com'}/ai-quiz?claimOffer=true" style="display:inline-block;background:#ef4444;color:white;text-decoration:none;font-weight:800;padding:14px 28px;border-radius:12px;font-size:15px;box-shadow:0 4px 15px rgba(239,68,68,0.25);">🎯 Claim ₹99 Trial Session Now</a>
           </div>
 
           <p style="color:#94a3b8;font-size:12px;margin:0;text-align:center;">Happy Learning!<br>© RUZANN EdTech</p>
