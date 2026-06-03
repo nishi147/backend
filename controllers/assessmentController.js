@@ -121,8 +121,44 @@ exports.getAssessments = async (req, res) => {
         const limit = parseInt(req.query.limit, 10) || 50;
         const startIndex = (page - 1) * limit;
 
-        const total = await AssessmentSubmission.countDocuments();
-        const submissions = await AssessmentSubmission.find()
+        const queryObj = {};
+
+        // Search in text fields
+        if (req.query.search) {
+            const searchRegex = new RegExp(req.query.search, 'i');
+            queryObj.$or = [
+                { studentName: searchRegex },
+                { parentName: searchRegex },
+                { mobile: searchRegex },
+                { email: searchRegex },
+                { city: searchRegex }
+            ];
+        }
+
+        // Filters
+        if (req.query.category) {
+            queryObj.category = req.query.category;
+        }
+        if (req.query.recommendedProgram) {
+            queryObj.recommendedProgram = req.query.recommendedProgram;
+        }
+        if (req.query.class) {
+            queryObj.class = req.query.class;
+        }
+
+        // Score range
+        if (req.query.minScore || req.query.maxScore) {
+            queryObj.score = {};
+            if (req.query.minScore) {
+                queryObj.score.$gte = parseInt(req.query.minScore, 10);
+            }
+            if (req.query.maxScore) {
+                queryObj.score.$lte = parseInt(req.query.maxScore, 10);
+            }
+        }
+
+        const total = await AssessmentSubmission.countDocuments(queryObj);
+        const submissions = await AssessmentSubmission.find(queryObj)
             .sort('-submittedAt')
             .skip(startIndex)
             .limit(limit);
@@ -134,6 +170,76 @@ exports.getAssessments = async (req, res) => {
             page,
             pages: Math.ceil(total / limit),
             data: submissions
+        });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+};
+
+// @desc    Get assessment submissions analytics
+// @route   GET /api/assessment-submissions/analytics
+// @access  Private (Admin, Sales)
+exports.getAssessmentAnalytics = async (req, res) => {
+    try {
+        const totalSubmissions = await AssessmentSubmission.countDocuments();
+        
+        const avgScoreRes = await AssessmentSubmission.aggregate([
+            { $group: { _id: null, avgScore: { $avg: '$score' } } }
+        ]);
+        const averageScore = avgScoreRes.length > 0 ? Math.round(avgScoreRes[0].avgScore) : 0;
+
+        const highPotentialCount = await AssessmentSubmission.countDocuments({ score: { $gte: 75 } });
+
+        const categoryStats = await AssessmentSubmission.aggregate([
+            { $group: { _id: '$category', count: { $sum: 1 } } }
+        ]);
+
+        const programStats = await AssessmentSubmission.aggregate([
+            { $group: { _id: '$recommendedProgram', count: { $sum: 1 } } }
+        ]);
+
+        const classStats = await AssessmentSubmission.aggregate([
+            { $group: { _id: '$class', count: { $sum: 1 } } }
+        ]);
+
+        const cityStats = await AssessmentSubmission.aggregate([
+            { $group: { _id: '$city', count: { $sum: 1 } } },
+            { $sort: { count: -1 } },
+            { $limit: 10 }
+        ]);
+
+        const ageStats = await AssessmentSubmission.aggregate([
+            { $group: { _id: '$age', count: { $sum: 1 } } },
+            { $sort: { _id: 1 } }
+        ]);
+
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const timelineStats = await AssessmentSubmission.aggregate([
+            { $match: { submittedAt: { $gte: thirtyDaysAgo } } },
+            {
+                $group: {
+                    _id: { $dateToString: { format: '%Y-%m-%d', date: '$submittedAt' } },
+                    count: { $sum: 1 },
+                    avgScore: { $avg: '$score' }
+                }
+            },
+            { $sort: { _id: 1 } }
+        ]);
+
+        res.status(200).json({
+            success: true,
+            data: {
+                totalSubmissions,
+                averageScore,
+                highPotentialCount,
+                categoryStats,
+                programStats,
+                classStats,
+                cityStats,
+                ageStats,
+                timelineStats
+            }
         });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });

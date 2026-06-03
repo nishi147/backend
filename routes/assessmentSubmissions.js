@@ -1,12 +1,15 @@
 const express = require('express');
 const {
     submitAssessment,
-    getAssessments
+    getAssessments,
+    getAssessmentAnalytics
 } = require('../controllers/assessmentController');
 
 const router = express.Router();
 
 const { protect, authorize } = require('../middleware/auth');
+
+router.get('/analytics', protect, authorize('admin', 'sales'), getAssessmentAnalytics);
 
 router.route('/')
     .post(submitAssessment) // Public endpoint for funnel submission
