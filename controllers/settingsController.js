@@ -9,7 +9,8 @@ exports.getSettings = async (req, res) => {
       // Create default settings if none exist
       settings = await Settings.create({
         privacyPolicy: { content: '' },
-        termsAndConditions: { content: '' }
+        termsAndConditions: { content: '' },
+        refundPolicy: { content: '' }
       });
     }
     res.status(200).json({ success: true, data: settings });
@@ -26,7 +27,7 @@ exports.updateSettings = async (req, res) => {
       settings = new Settings();
     }
 
-    const { privacyContent, termsContent } = req.body;
+    const { privacyContent, termsContent, refundContent } = req.body;
 
     // Update content if provided
     if (privacyContent !== undefined) {
@@ -36,6 +37,10 @@ exports.updateSettings = async (req, res) => {
     if (termsContent !== undefined) {
       settings.termsAndConditions.content = termsContent;
       settings.termsAndConditions.updatedAt = Date.now();
+    }
+    if (refundContent !== undefined) {
+      settings.refundPolicy.content = refundContent;
+      settings.refundPolicy.updatedAt = Date.now();
     }
 
     // Handle file uploads
@@ -47,6 +52,10 @@ exports.updateSettings = async (req, res) => {
       if (req.files.termsFile) {
         settings.termsAndConditions.fileUrl = await uploadToCloudinary(req.files.termsFile[0].buffer, 'ruzann/legal');
         settings.termsAndConditions.updatedAt = Date.now();
+      }
+      if (req.files.refundFile) {
+        settings.refundPolicy.fileUrl = await uploadToCloudinary(req.files.refundFile[0].buffer, 'ruzann/legal');
+        settings.refundPolicy.updatedAt = Date.now();
       }
     }
 

@@ -12,7 +12,8 @@ router.put('/',
   authorize('admin'), 
   upload.fields([
     { name: 'privacyFile', maxCount: 1 },
-    { name: 'termsFile', maxCount: 1 }
+    { name: 'termsFile', maxCount: 1 },
+    { name: 'refundFile', maxCount: 1 }
   ]), 
   updateSettings
 );

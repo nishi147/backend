@@ -28,6 +28,20 @@ const SettingsSchema = new mongoose.Schema({
       type: Date,
       default: Date.now
     }
+  },
+  refundPolicy: {
+    content: {
+      type: String,
+      default: ''
+    },
+    fileUrl: {
+      type: String,
+      default: ''
+    },
+    updatedAt: {
+      type: Date,
+      default: Date.now
+    }
   }
 }, { timestamps: true });
 
